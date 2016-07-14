@@ -28,8 +28,6 @@ Pod::Spec.new do |s|
   s.source_files  = "Classes", "BoneGrayPodTest/Classes/**/*.{h,m}"
   s.exclude_files = "Classes/Exclude"
 
-  s.public_header_files = "BoneGrayPodTest/Classes/UIKit/UI_Categories.h","BoneGrayPodTest/Classes/Foundation/Foundation_Category.h","BoneGrayPodTest/Classes/**/*.h"
-
   s.requires_arc = true
 
 
