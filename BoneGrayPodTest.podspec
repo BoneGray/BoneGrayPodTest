@@ -4,7 +4,7 @@ Pod::Spec.new do |s|
 
 
   s.name         = "BoneGrayPodTest"
-  s.version      = "0.0.1"
+  s.version      = "0.0.4"
   s.summary      = "all kinds of categories for iOS develop"
 
   s.description  = <<-DESC
