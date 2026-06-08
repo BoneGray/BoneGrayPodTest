@@ -1,0 +1,10 @@
+[gd_scene format=3 uid="uid://ctcnppr7145lk"]
+
+[ext_resource type="Script" uid="uid://l7td0yyvyh6k" path="res://scripts/terrain_random_demo.gd" id="1_terrain"]
+
+[node name="TerrainRandomDemo" type="Node2D" unique_id=1566293513]
+script = ExtResource("1_terrain")
+
+[node name="Camera2D" type="Camera2D" parent="." unique_id=32392255]
+position = Vector2(640, 384)
+zoom = Vector2(1.5, 1.5)

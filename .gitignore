@@ -1,0 +1,25 @@
+# Godot generated cache
+.godot/
+
+# Local Codex workspace metadata
+.codex/
+
+# Imported/exported build outputs
+export/
+exports/
+build/
+dist/
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+desktop.ini
+*.tmp
+*.bak
+*.swp
+
+# Logs
+*.log
+
+# Temporary local push staging
+_push_staging*/

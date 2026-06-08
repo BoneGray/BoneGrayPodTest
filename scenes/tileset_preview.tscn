@@ -1,0 +1,12 @@
+[gd_scene format=3 uid="uid://bh6ctbn2d3ljr"]
+
+[ext_resource type="Script" uid="uid://cckdt3miacc65" path="res://scripts/tileset_preview.gd" id="1_preview"]
+[ext_resource type="Texture2D" uid="uid://bvf5hfupce8l4" path="res://assets/world/tiles/background/background_bleak_yellow_tileset.png" id="2_tiles"]
+
+[node name="TilesetPreview" type="Node2D" unique_id=575429754]
+script = ExtResource("1_preview")
+tileset_texture = ExtResource("2_tiles")
+
+[node name="Camera2D" type="Camera2D" parent="." unique_id=1011330441]
+position = Vector2(384, 272)
+zoom = Vector2(1.5, 1.5)
