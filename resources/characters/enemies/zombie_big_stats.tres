@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EnemyStats" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/enemies/enemy_stats.gd" id="1_enemy_stats"]
+
+[resource]
+script = ExtResource("1_enemy_stats")
+display_name = "Zombie Big"
+max_health = 30
+move_speed = 42.0
+defense = 0
+attack_power = 8
+detect_range = 96.0
+lose_target_range = 144.0
+attack_range = 18.0
+attack_cooldown = 1.2
+knockback_resistance = 0.1
+separation_radius = 16.0
+separation_strength = 0.35

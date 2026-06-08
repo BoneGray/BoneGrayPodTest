@@ -62,6 +62,7 @@ func _initialize() -> void:
 		"AttackArea2D/CollisionShape2D",
 		"HitboxArea2D",
 		"HitboxArea2D/CollisionShape2D",
+		"HurtFlashFeedback",
 	]
 
 	for node_path in required_nodes:
@@ -72,6 +73,13 @@ func _initialize() -> void:
 			return
 
 	var animation_player := player.get_node("AnimationPlayer") as AnimationPlayer
+	var stats := player.get("stats") as Resource
+	if stats == null:
+		push_error("Player stats resource is missing.")
+		root.queue_free()
+		quit(1)
+		return
+
 	for animation_name in REQUIRED_PLAYER_ANIMATIONS:
 		if not animation_player.has_animation(animation_name):
 			push_error("Missing Player AnimationPlayer animation: %s" % animation_name)

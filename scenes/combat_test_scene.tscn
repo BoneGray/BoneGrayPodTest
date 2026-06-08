@@ -1,25 +1,28 @@
 [gd_scene format=3]
 
-[ext_resource type="Script" path="res://scripts/camera_follow_target.gd" id="1_hw2t7"]
-[ext_resource type="PackedScene" path="res://scenes/characters/player.tscn" id="2_dylen"]
-[ext_resource type="Script" path="res://scripts/zombie_big_attack_controller.gd" id="3_b516k"]
-[ext_resource type="PackedScene" path="res://scenes/characters/enemy.tscn" id="4_q3i68"]
-[ext_resource type="Script" path="res://scripts/simple_hit_target.gd" id="5_5n53l"]
+[ext_resource type="Script" path="res://scripts/camera_follow_target.gd" id="1_dylen"]
+[ext_resource type="PackedScene" path="res://scenes/characters/player.tscn" id="2_b516k"]
+[ext_resource type="Script" path="res://scripts/zombie_big_attack_controller.gd" id="3_q3i68"]
+[ext_resource type="PackedScene" path="res://scenes/characters/enemy.tscn" id="4_5n53l"]
+[ext_resource type="Script" path="res://scripts/enemies/base_enemy.gd" id="5_t56bx"]
+[ext_resource type="Resource" path="res://resources/characters/enemies/zombie_big_stats.tres" id="6_ppm2l"]
 
-[node name="CombatTestScene" type="Node2D" unique_id=910823849]
+[node name="CombatTestScene" type="Node2D" unique_id=765223507]
+y_sort_enabled = true
 
-[node name="Camera2D" type="Camera2D" parent="." unique_id=586034594]
+[node name="Camera2D" type="Camera2D" parent="." unique_id=972507090]
 zoom = Vector2(3, 3)
 position_smoothing_enabled = true
-script = ExtResource("1_hw2t7")
+script = ExtResource("1_dylen")
 target_path = NodePath("../Player")
 
-[node name="Player" type="CharacterBody2D" parent="." unique_id=1597506238 groups=["player"] instance=ExtResource("2_dylen")]
+[node name="Player" type="CharacterBody2D" parent="." unique_id=1892881530 groups=["player"] instance=ExtResource("2_b516k")]
 position = Vector2(120, 120)
-script = ExtResource("3_b516k")
+script = ExtResource("3_q3i68")
 target_group = "enemy"
 camera_follow_enabled = false
 
-[node name="Enemy" type="CharacterBody2D" parent="." unique_id=2127768001 groups=["enemy"] instance=ExtResource("4_q3i68")]
+[node name="Enemy" type="CharacterBody2D" parent="." unique_id=1688546181 groups=["enemy"] instance=ExtResource("4_5n53l")]
 position = Vector2(176, 120)
-script = ExtResource("5_5n53l")
+script = ExtResource("5_t56bx")
+stats = ExtResource("6_ppm2l")
