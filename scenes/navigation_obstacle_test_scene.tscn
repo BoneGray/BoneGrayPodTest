@@ -1,0 +1,157 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/camera_follow_target.gd" id="1_408im"]
+[ext_resource type="PackedScene" path="res://scenes/characters/player.tscn" id="2_2usuc"]
+[ext_resource type="Script" path="res://scripts/zombie_big_attack_controller.gd" id="3_s3y28"]
+[ext_resource type="Resource" path="res://resources/characters/player/player_stats.tres" id="4_7ouwi"]
+[ext_resource type="PackedScene" path="res://scenes/characters/enemy.tscn" id="5_vkqie"]
+[ext_resource type="Script" path="res://scripts/enemies/base_enemy.gd" id="6_nxpj1"]
+[ext_resource type="Resource" path="res://resources/characters/enemies/zombie_big_stats.tres" id="7_llvj4"]
+
+[sub_resource type="NavigationPolygon" id="NavigationPolygon_wwjcm"]
+vertices = PackedVector2Array(424, 56, 424, 304, 380, 220, 380, 164, 356, 148, 260, 164, 300, 148, 56, 304, 260, 220, 220, 212, 156, 212, 56, 56, 156, 84, 356, 60, 300, 60, 220, 84)
+polygons = Array[PackedInt32Array]([PackedInt32Array(0, 1, 2, 3), PackedInt32Array(4, 3, 5, 6), PackedInt32Array(2, 1, 7, 8), PackedInt32Array(9, 8, 7, 10), PackedInt32Array(10, 7, 11, 12), PackedInt32Array(0, 3, 4, 13), PackedInt32Array(11, 0, 13, 14), PackedInt32Array(12, 11, 14, 15), PackedInt32Array(15, 14, 6, 5), PackedInt32Array(9, 15, 5, 8)])
+outlines = Array[PackedVector2Array]([PackedVector2Array(56, 56, 424, 56, 424, 304, 56, 304), PackedVector2Array(156, 84, 220, 84, 220, 212, 156, 212), PackedVector2Array(260, 164, 380, 164, 380, 220, 260, 220), PackedVector2Array(300, 60, 356, 60, 356, 148, 300, 148)])
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_pnunq"]
+size = Vector2(400, 16)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_u4paa"]
+size = Vector2(400, 16)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_unj6n"]
+size = Vector2(16, 280)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_ht6pj"]
+size = Vector2(16, 280)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_vc7jk"]
+size = Vector2(40, 104)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_knca8"]
+size = Vector2(96, 32)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_q3mvc"]
+size = Vector2(32, 64)
+
+[node name="NavigationObstacleTestScene" type="Node2D" unique_id=1942278610]
+y_sort_enabled = true
+
+[node name="Floor" type="Polygon2D" parent="." unique_id=556704614]
+color = Color(0.23, 0.23, 0.23, 1)
+polygon = PackedVector2Array(56, 56, 424, 56, 424, 304, 56, 304)
+
+[node name="NavigationRegion2D" type="NavigationRegion2D" parent="." unique_id=2090205375]
+navigation_polygon = SubResource("NavigationPolygon_wwjcm")
+
+[node name="OuterObstacle1Body" type="StaticBody2D" parent="." unique_id=694306834]
+position = Vector2(240, 48)
+collision_mask = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="OuterObstacle1Body" unique_id=926686325]
+shape = SubResource("RectangleShape2D_pnunq")
+
+[node name="OuterObstacle1Visual" type="Polygon2D" parent="OuterObstacle1Body" unique_id=29926499]
+color = Color(0.9, 0.08, 0.06, 0.9)
+polygon = PackedVector2Array(-200, -8, 200, -8, 200, 8, -200, 8)
+
+[node name="OuterObstacle2Body" type="StaticBody2D" parent="." unique_id=608184727]
+position = Vector2(240, 312)
+collision_mask = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="OuterObstacle2Body" unique_id=665911747]
+shape = SubResource("RectangleShape2D_u4paa")
+
+[node name="OuterObstacle2Visual" type="Polygon2D" parent="OuterObstacle2Body" unique_id=852227181]
+color = Color(0.9, 0.08, 0.06, 0.9)
+polygon = PackedVector2Array(-200, -8, 200, -8, 200, 8, -200, 8)
+
+[node name="OuterObstacle3Body" type="StaticBody2D" parent="." unique_id=1272477593]
+position = Vector2(48, 180)
+collision_mask = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="OuterObstacle3Body" unique_id=2093924924]
+shape = SubResource("RectangleShape2D_unj6n")
+
+[node name="OuterObstacle3Visual" type="Polygon2D" parent="OuterObstacle3Body" unique_id=571883735]
+color = Color(0.9, 0.08, 0.06, 0.9)
+polygon = PackedVector2Array(-8, -140, 8, -140, 8, 140, -8, 140)
+
+[node name="OuterObstacle4Body" type="StaticBody2D" parent="." unique_id=1694943378]
+position = Vector2(432, 180)
+collision_mask = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="OuterObstacle4Body" unique_id=1532781498]
+shape = SubResource("RectangleShape2D_ht6pj")
+
+[node name="OuterObstacle4Visual" type="Polygon2D" parent="OuterObstacle4Body" unique_id=373252504]
+color = Color(0.9, 0.08, 0.06, 0.9)
+polygon = PackedVector2Array(-8, -140, 8, -140, 8, 140, -8, 140)
+
+[node name="InnerObstacle1Body" type="StaticBody2D" parent="." unique_id=1230936244]
+position = Vector2(188, 148)
+collision_mask = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="InnerObstacle1Body" unique_id=759986186]
+shape = SubResource("RectangleShape2D_vc7jk")
+
+[node name="InnerObstacle1Visual" type="Polygon2D" parent="InnerObstacle1Body" unique_id=290302794]
+color = Color(0.9, 0.08, 0.06, 0.9)
+polygon = PackedVector2Array(-20, -52, 20, -52, 20, 52, -20, 52)
+
+[node name="InnerObstacle2Body" type="StaticBody2D" parent="." unique_id=1194065687]
+position = Vector2(320, 192)
+collision_mask = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="InnerObstacle2Body" unique_id=1770663152]
+shape = SubResource("RectangleShape2D_knca8")
+
+[node name="InnerObstacle2Visual" type="Polygon2D" parent="InnerObstacle2Body" unique_id=2128221561]
+color = Color(0.9, 0.08, 0.06, 0.9)
+polygon = PackedVector2Array(-48, -16, 48, -16, 48, 16, -48, 16)
+
+[node name="InnerObstacle3Body" type="StaticBody2D" parent="." unique_id=1038220370]
+position = Vector2(328, 104)
+collision_mask = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="InnerObstacle3Body" unique_id=51241910]
+shape = SubResource("RectangleShape2D_q3mvc")
+
+[node name="InnerObstacle3Visual" type="Polygon2D" parent="InnerObstacle3Body" unique_id=2072335601]
+color = Color(0.9, 0.08, 0.06, 0.9)
+polygon = PackedVector2Array(-16, -32, 16, -32, 16, 32, -16, 32)
+
+[node name="Camera2D" type="Camera2D" parent="." unique_id=979629391]
+zoom = Vector2(2.5, 2.5)
+position_smoothing_enabled = true
+script = ExtResource("1_408im")
+target_path = NodePath("../Player")
+
+[node name="Player" type="CharacterBody2D" parent="." unique_id=1892881530 groups=["player"] instance=ExtResource("2_2usuc")]
+position = Vector2(156, 144)
+collision_layer = 2
+script = ExtResource("3_s3y28")
+stats = ExtResource("4_7ouwi")
+target_group = "enemy"
+camera_follow_enabled = false
+
+[node name="NavEnemy1" type="CharacterBody2D" parent="." unique_id=1688546181 groups=["enemy"] instance=ExtResource("5_vkqie")]
+position = Vector2(220, 144)
+collision_layer = 4
+script = ExtResource("6_nxpj1")
+stats = ExtResource("7_llvj4")
+use_navigation_agent = true
+
+[node name="NavEnemy2" type="CharacterBody2D" parent="." unique_id=1678286791 groups=["enemy"] instance=ExtResource("5_vkqie")]
+position = Vector2(156, 88)
+collision_layer = 4
+script = ExtResource("6_nxpj1")
+stats = ExtResource("7_llvj4")
+use_navigation_agent = true
+
+[node name="NavEnemy3" type="CharacterBody2D" parent="." unique_id=169297135 groups=["enemy"] instance=ExtResource("5_vkqie")]
+position = Vector2(104, 176)
+collision_layer = 4
+script = ExtResource("6_nxpj1")
+stats = ExtResource("7_llvj4")
+use_navigation_agent = true

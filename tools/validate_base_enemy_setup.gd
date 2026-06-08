@@ -77,6 +77,17 @@ func _validate_enemy_scene() -> bool:
 		enemy.queue_free()
 		return false
 
+	var navigation_agent := enemy.get_node("NavigationAgent2D") as NavigationAgent2D
+	if navigation_agent == null or navigation_agent.avoidance_enabled:
+		push_error("Enemy NavigationAgent2D must exist with avoidance disabled by default.")
+		enemy.queue_free()
+		return false
+
+	if enemy.get("use_navigation_agent"):
+		push_error("Enemy should keep NavigationAgent2D disabled by default.")
+		enemy.queue_free()
+		return false
+
 	var stats := enemy.get("stats") as Resource
 	if stats == null:
 		push_error("Enemy stats resource is missing.")
@@ -104,14 +115,8 @@ func _validate_enemy_test_scene() -> bool:
 		return false
 
 	var root := scene.instantiate()
-	var navigation_region := root.get_node_or_null("NavigationRegion2D") as NavigationRegion2D
 	var player := root.get_node_or_null("Player") as CharacterBody2D
 	var enemies := root.find_children("Enemy*", "CharacterBody2D", false, false)
-	if navigation_region == null or navigation_region.navigation_polygon == null:
-		push_error("Enemy test scene missing NavigationRegion2D.")
-		root.queue_free()
-		return false
-
 	if root is Node2D and not (root as Node2D).y_sort_enabled:
 		push_error("Enemy test scene must enable Y Sort.")
 		root.queue_free()

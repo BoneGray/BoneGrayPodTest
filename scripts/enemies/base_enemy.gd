@@ -8,19 +8,40 @@ signal attack_hit(target: Node)
 enum State {
 	IDLE,
 	CHASE,
+	APPROACH_ATTACK_SLOT,
 	ATTACK,
 	HURT,
 	DEAD,
+	PATROL,
 }
+
+const ATTACK_SLOT_DIRECTIONS := [
+	"side",
+	"side_left",
+	"down",
+	"up",
+]
 
 @export var stats: Resource
 @export var target_group := "player"
 @export var start_state := State.IDLE
 @export var auto_acquire_target := true
 @export var path_refresh_interval := 0.25
-@export var use_navigation_agent := true
+@export var use_navigation_agent := false
 @export var use_separation := true
 @export var damage_log_enabled := true
+@export var direct_chase_range := 48.0
+@export var attack_slot_start_range_padding := 24.0
+@export var attack_slot_exit_range_padding := 36.0
+@export var attack_slot_arrive_distance := 2.0
+@export var attack_slot_timeout := 1.0
+@export var attack_slot_reachable_distance := 10.0
+@export var idle_patrol_enabled := true
+@export var idle_duration_min := 0.8
+@export var idle_duration_max := 1.8
+@export var patrol_duration_min := 1.4
+@export var patrol_duration_max := 2.4
+@export var patrol_speed_scale := 0.6
 
 @onready var sprite: AnimatedSprite2D = $Sprite
 @onready var body_collision_shape: CollisionShape2D = $BodyCollisionShape2D
@@ -35,19 +56,48 @@ var health := 1
 var state := State.IDLE
 var target: Node2D
 var current_direction := "down"
+var last_horizontal_direction := "side"
 var attack_cooldown_remaining := 0.0
 var path_refresh_remaining := 0.0
+var navigation_destination := Vector2.INF
+var idle_patrol_remaining := 0.0
+var patrol_direction := Vector2.DOWN
+var attack_slot_direction := "down"
+var attack_slot_position := Vector2.ZERO
+var has_attack_slot := false
+var attack_slot_elapsed := 0.0
+var attack_slot_excluded_directions: Array[String] = []
+var attack_elapsed := 0.0
+var current_attack_action := ""
 var _hit_targets: Array[Node] = []
+var _default_collision_layer := 0
+var _default_collision_mask := 0
+var _default_hitbox_monitoring := true
+var _default_hitbox_monitorable := true
+var _default_attack_area_position := Vector2.ZERO
+var _attack_slot_manager: Node
+
+var attack_hit_frames := {
+	"first_attack": [4],
+	"second_attack": [7, 8],
+}
+
+var attack_hit_windows := {
+	"first_attack": [Vector2(0.2, 0.65)],
+	"second_attack": [Vector2(0.3, 0.9)],
+}
 
 
 func _ready() -> void:
-	state = start_state
-	health = get_max_health()
-	_set_attack_active(false)
-	_play_idle()
-	health_changed.emit(health, get_max_health())
-	if auto_acquire_target:
-		call_deferred("_acquire_target")
+	_cache_lifecycle_defaults()
+	_attack_slot_manager = get_tree().root.get_node_or_null("EnemyAttackSlotManager")
+	if animation_player != null and not animation_player.animation_finished.is_connected(_on_animation_player_finished):
+		animation_player.animation_finished.connect(_on_animation_player_finished)
+	if not sprite.frame_changed.is_connected(_on_sprite_frame_changed):
+		sprite.frame_changed.connect(_on_sprite_frame_changed)
+	if not sprite.animation_finished.is_connected(_on_sprite_animation_finished):
+		sprite.animation_finished.connect(_on_sprite_animation_finished)
+	activate(global_position, stats)
 
 
 func _physics_process(delta: float) -> void:
@@ -57,15 +107,36 @@ func _physics_process(delta: float) -> void:
 
 	attack_cooldown_remaining = maxf(attack_cooldown_remaining - delta, 0.0)
 	path_refresh_remaining = maxf(path_refresh_remaining - delta, 0.0)
+	if state == State.ATTACK:
+		attack_elapsed += delta
+	if target != null and not _is_valid_target(target):
+		_clear_target()
 	if target == null and auto_acquire_target:
 		_acquire_target()
 
-	if state == State.CHASE:
-		_chase_target(delta)
+	if target == null and state != State.ATTACK:
+		_update_idle_patrol(delta)
+		move_and_slide()
+		return
+
+	if state == State.CHASE or state == State.APPROACH_ATTACK_SLOT:
+		_update_combat_movement(delta)
+	elif state == State.ATTACK:
+		velocity = Vector2.ZERO
+		if _is_current_attack_hit_window():
+			_sync_attack_area_to_direction()
+			_apply_attack_hits()
+		if not _is_attack_animation_playing() and not attack_area.monitoring:
+			_finish_attack()
 	else:
 		velocity = Vector2.ZERO
 	move_and_slide()
 	_apply_active_attack_hits()
+
+
+func _process(_delta: float) -> void:
+	if state == State.ATTACK:
+		_apply_active_attack_hits()
 
 
 func configure_stats(new_stats: Resource) -> void:
@@ -74,11 +145,90 @@ func configure_stats(new_stats: Resource) -> void:
 	health_changed.emit(health, get_max_health())
 
 
+func activate(spawn_position: Vector2, new_stats: Resource = null) -> void:
+	_release_attack_slot()
+	if new_stats != null:
+		stats = new_stats
+
+	global_position = spawn_position
+	show()
+	add_to_group("enemy")
+	state = start_state
+	health = get_max_health()
+	target = null
+	velocity = Vector2.ZERO
+	current_direction = "down"
+	last_horizontal_direction = "side"
+	idle_patrol_remaining = _random_idle_duration()
+	patrol_direction = _random_patrol_direction()
+	attack_slot_direction = "down"
+	attack_slot_position = spawn_position
+	has_attack_slot = false
+	attack_slot_elapsed = 0.0
+	attack_slot_excluded_directions.clear()
+	attack_elapsed = 0.0
+	current_attack_action = ""
+	attack_cooldown_remaining = 0.0
+	path_refresh_remaining = 0.0
+	navigation_destination = Vector2.INF
+	_hit_targets.clear()
+	collision_layer = _default_collision_layer
+	collision_mask = _default_collision_mask
+	hitbox_area.monitoring = _default_hitbox_monitoring
+	hitbox_area.monitorable = _default_hitbox_monitorable
+	attack_area.position = _default_attack_area_position
+	if animation_player != null:
+		animation_player.stop()
+	sprite.modulate = Color.WHITE
+	_set_attack_active(false)
+	set_physics_process(true)
+	_play_idle()
+	health_changed.emit(health, get_max_health())
+	if auto_acquire_target:
+		call_deferred("_acquire_target")
+
+
+func deactivate() -> void:
+	_release_attack_slot()
+	target = null
+	velocity = Vector2.ZERO
+	state = State.DEAD
+	attack_cooldown_remaining = 0.0
+	path_refresh_remaining = 0.0
+	navigation_destination = Vector2.INF
+	has_attack_slot = false
+	attack_slot_elapsed = 0.0
+	attack_slot_excluded_directions.clear()
+	attack_elapsed = 0.0
+	current_attack_action = ""
+	_hit_targets.clear()
+	remove_from_group("enemy")
+	set_physics_process(false)
+	collision_layer = 0
+	collision_mask = 0
+	hitbox_area.monitoring = false
+	hitbox_area.monitorable = false
+	if animation_player != null:
+		animation_player.stop()
+	sprite.stop()
+	_set_attack_active(false)
+	hide()
+
+
 func set_target(new_target: Node2D) -> void:
+	if new_target != null and not _is_valid_target(new_target):
+		new_target = null
+	if new_target == target:
+		return
+	if new_target != target:
+		_release_attack_slot()
+		attack_slot_excluded_directions.clear()
 	target = new_target
-	if state != State.DEAD:
+	if state != State.DEAD and state != State.ATTACK:
 		state = State.CHASE if target != null else State.IDLE
 		path_refresh_remaining = 0.0
+		navigation_destination = Vector2.INF
+		idle_patrol_remaining = _random_idle_duration()
 
 
 func take_damage(amount: int) -> void:
@@ -99,18 +249,21 @@ func die() -> void:
 	if state == State.DEAD:
 		return
 
+	_release_attack_slot()
 	state = State.DEAD
-	velocity = Vector2.ZERO
-	_set_attack_active(false)
-	if sprite.sprite_frames != null and sprite.sprite_frames.has_animation("first_death_side"):
-		sprite.play("first_death_side")
-	else:
-		hide()
+	_disable_combat_logic()
+	_play_death()
 	died.emit(self)
 
 
 func can_attack() -> bool:
-	return target != null and attack_cooldown_remaining == 0.0 and global_position.distance_to(target.global_position) <= get_attack_range()
+	if target == null or attack_cooldown_remaining > 0.0:
+		return false
+	return _is_target_in_attack_range(target) and _is_target_in_attack_area(target)
+
+
+func is_alive() -> bool:
+	return state != State.DEAD
 
 
 func begin_attack(animation_name := "first_attack") -> void:
@@ -119,12 +272,110 @@ func begin_attack(animation_name := "first_attack") -> void:
 
 	state = State.ATTACK
 	attack_cooldown_remaining = get_attack_cooldown()
+	attack_elapsed = 0.0
 	_hit_targets.clear()
+	_sync_attack_area_to_direction()
 	animation_name = _directional_animation_name(animation_name)
+	current_attack_action = _attack_action_from_animation(animation_name)
 	if animation_player != null and animation_player.has_animation(animation_name):
 		animation_player.play(animation_name)
 	elif sprite.sprite_frames != null and sprite.sprite_frames.has_animation(animation_name):
 		sprite.play(animation_name)
+	else:
+		_finish_attack()
+
+
+func _on_animation_player_finished(animation_name: StringName) -> void:
+	if state == State.ATTACK and _is_attack_animation(animation_name):
+		_finish_attack()
+
+
+func _on_sprite_frame_changed() -> void:
+	if state != State.ATTACK:
+		return
+
+	var action_name := _attack_action_from_animation(sprite.animation)
+	if not attack_hit_frames.has(action_name):
+		return
+
+	var hit_frames: Array = attack_hit_frames[action_name]
+	if sprite.frame in hit_frames:
+		_sync_attack_area_to_direction()
+		_apply_attack_hits()
+
+
+func _on_sprite_animation_finished() -> void:
+	if state == State.ATTACK and _is_attack_animation(sprite.animation):
+		_finish_attack()
+
+
+func _finish_attack() -> void:
+	_set_attack_active(false)
+	_hit_targets.clear()
+	attack_elapsed = 0.0
+	current_attack_action = ""
+	if state == State.DEAD:
+		return
+
+	if target == null:
+		state = State.IDLE
+		velocity = Vector2.ZERO
+		_play_idle()
+		return
+
+	state = State.CHASE
+	velocity = Vector2.ZERO
+	_play_idle()
+
+
+func _clear_target() -> void:
+	_release_attack_slot()
+	target = null
+	attack_slot_excluded_directions.clear()
+	velocity = Vector2.ZERO
+	path_refresh_remaining = 0.0
+	navigation_destination = Vector2.INF
+	current_attack_action = ""
+	attack_elapsed = 0.0
+	_hit_targets.clear()
+	_set_attack_active(false)
+	if animation_player != null:
+		animation_player.stop()
+	if state != State.DEAD:
+		_start_idle()
+
+
+func _is_attack_animation(animation_name: StringName) -> bool:
+	var name := String(animation_name)
+	return name.begins_with("first_attack_") or name.begins_with("second_attack_")
+
+
+func _attack_action_from_animation(animation_name: StringName) -> String:
+	var name := String(animation_name)
+	if name.begins_with("first_attack_"):
+		return "first_attack"
+	if name.begins_with("second_attack_"):
+		return "second_attack"
+	return name
+
+
+func _is_current_attack_hit_window() -> bool:
+	if not attack_hit_windows.has(current_attack_action):
+		return false
+
+	var windows: Array = attack_hit_windows[current_attack_action]
+	for window in windows:
+		if attack_elapsed >= window.x and attack_elapsed <= window.y:
+			return true
+	return false
+
+
+func _is_attack_animation_playing() -> bool:
+	if animation_player != null and animation_player.is_playing():
+		return _is_attack_animation(animation_player.current_animation)
+	if sprite.is_playing():
+		return _is_attack_animation(sprite.animation)
+	return false
 
 
 func get_max_health() -> int:
@@ -175,7 +426,7 @@ func get_separation_strength() -> float:
 	return stats.separation_strength if stats != null else 0.35
 
 
-func _chase_target(_delta: float) -> void:
+func _update_combat_movement(_delta: float) -> void:
 	if target == null:
 		state = State.IDLE
 		velocity = Vector2.ZERO
@@ -189,13 +440,38 @@ func _chase_target(_delta: float) -> void:
 		_play_idle()
 		return
 
-	if to_target.length() <= get_attack_range():
-		velocity = Vector2.ZERO
-		current_direction = _direction_from_vector(to_target)
-		_play_idle()
+	if _should_use_attack_slot(to_target):
+		_update_attack_slot(to_target, _delta)
+		current_direction = attack_slot_direction
+		_sync_attack_area_to_direction()
+
+		if has_attack_slot and can_attack():
+			velocity = Vector2.ZERO
+			begin_attack()
+			return
+
+		var to_slot := attack_slot_position - global_position
+		if _should_give_up_attack_slot(to_slot):
+			_exclude_current_attack_slot()
+			state = State.CHASE
+			velocity = Vector2.ZERO
+			_play_idle()
+			return
+
+		if to_slot.length() <= attack_slot_arrive_distance:
+			velocity = Vector2.ZERO
+			_play_idle()
+			return
+
+		var slot_direction := _get_path_direction(attack_slot_position, to_slot)
+		velocity = slot_direction * get_move_speed()
+		_play_walk(slot_direction)
 		return
 
-	var direction := _get_path_direction(to_target)
+	state = State.CHASE
+	_release_attack_slot()
+	attack_slot_excluded_directions.clear()
+	var direction := _get_path_direction(target.global_position, to_target)
 	if use_separation:
 		var separation := _get_separation_direction()
 		if separation != Vector2.ZERO:
@@ -206,14 +482,112 @@ func _chase_target(_delta: float) -> void:
 	_play_walk(direction)
 
 
+func _should_use_attack_slot(to_target: Vector2) -> bool:
+	if state == State.APPROACH_ATTACK_SLOT:
+		var should_keep_slot := to_target.length() <= get_attack_range() + attack_slot_exit_range_padding
+		if not should_keep_slot:
+			_release_attack_slot()
+		return should_keep_slot
+	return to_target.length() <= get_attack_range() + attack_slot_start_range_padding
+
+
+func _update_attack_slot(to_target: Vector2, delta: float) -> void:
+	var was_approaching := state == State.APPROACH_ATTACK_SLOT
+	state = State.APPROACH_ATTACK_SLOT
+	if not was_approaching or not has_attack_slot:
+		if attack_slot_excluded_directions.size() >= ATTACK_SLOT_DIRECTIONS.size():
+			attack_slot_excluded_directions.clear()
+		var preferred_direction := _direction_from_vector(to_target)
+		var claimed_direction := _claim_attack_slot(preferred_direction)
+		has_attack_slot = claimed_direction != ""
+		attack_slot_direction = claimed_direction if has_attack_slot else preferred_direction
+		attack_slot_elapsed = 0.0
+	attack_slot_position = _get_attack_slot_position(attack_slot_direction)
+	if has_attack_slot:
+		attack_slot_elapsed += delta
+		if not _is_attack_slot_reachable(attack_slot_position):
+			_exclude_current_attack_slot()
+
+
+func _claim_attack_slot(preferred_direction: String) -> String:
+	if _attack_slot_manager != null and _attack_slot_manager.has_method("claim_slot"):
+		return _attack_slot_manager.claim_slot(self, target, preferred_direction, attack_slot_excluded_directions)
+	if preferred_direction in attack_slot_excluded_directions:
+		return ""
+	return preferred_direction
+
+
+func _release_attack_slot() -> void:
+	if _attack_slot_manager != null and _attack_slot_manager.has_method("release_slot"):
+		_attack_slot_manager.release_slot(self)
+	has_attack_slot = false
+	attack_slot_elapsed = 0.0
+
+
+func _exclude_current_attack_slot() -> void:
+	if has_attack_slot and not attack_slot_direction in attack_slot_excluded_directions:
+		attack_slot_excluded_directions.append(attack_slot_direction)
+	_release_attack_slot()
+	navigation_destination = Vector2.INF
+	path_refresh_remaining = 0.0
+
+
+func _should_give_up_attack_slot(to_slot: Vector2) -> bool:
+	if not has_attack_slot:
+		return false
+	return attack_slot_elapsed >= attack_slot_timeout and to_slot.length() > attack_slot_arrive_distance
+
+
+func _is_attack_slot_reachable(slot_position: Vector2) -> bool:
+	if navigation_agent == null or not use_navigation_agent:
+		return true
+
+	var navigation_map := navigation_agent.get_navigation_map()
+	var path := NavigationServer2D.map_get_path(navigation_map, global_position, slot_position, true)
+	if path.size() < 2:
+		return false
+
+	var final_position := path[path.size() - 1]
+	return final_position.distance_to(slot_position) <= attack_slot_reachable_distance
+
+
+func _get_attack_slot_position(direction: String) -> Vector2:
+	if not has_attack_slot:
+		return _get_attack_wait_position()
+
+	var attack_offset := _get_attack_area_position_for_direction(direction)
+	if attack_offset == Vector2.ZERO:
+		attack_offset = _direction_to_vector(direction) * minf(get_attack_range(), 16.0)
+	return target.global_position - attack_offset
+
+
+func _get_attack_wait_position() -> Vector2:
+	if _attack_slot_manager != null and _attack_slot_manager.has_method("get_wait_position"):
+		return _attack_slot_manager.get_wait_position(self, target)
+	return target.global_position - _direction_to_vector(attack_slot_direction) * direct_chase_range
+
+
+func _direction_to_vector(direction: String) -> Vector2:
+	if direction == "side":
+		return Vector2.RIGHT
+	if direction == "side_left":
+		return Vector2.LEFT
+	if direction == "up":
+		return Vector2.UP
+	return Vector2.DOWN
+
+
 func _acquire_target() -> void:
+	if state == State.DEAD:
+		return
+
 	var candidates := _get_target_candidates()
 	var closest: Node2D
 	var detect_range_squared := get_detect_range() * get_detect_range()
 	var closest_distance := detect_range_squared
 	for candidate in candidates:
 		var candidate_node := candidate as Node2D
-		if candidate_node == null:
+		if not _is_valid_target(candidate_node):
 			continue
 		var distance := global_position.distance_squared_to(candidate_node.global_position)
 		if distance <= closest_distance:
@@ -233,6 +607,19 @@ func _get_target_candidates() -> Array[Node]:
 	return fallback_candidates
 
 
+func _is_valid_target(candidate: Node) -> bool:
+	var candidate_node := candidate as Node2D
+	if candidate_node == null or not candidate_node.is_inside_tree():
+		return false
+	if target_group != "" and not candidate_node.is_in_group(target_group):
+		return false
+	if candidate_node.has_method("is_alive") and not candidate_node.is_alive():
+		return false
+	if candidate_node.has_method("get_current_health") and candidate_node.get_current_health() <= 0:
+		return false
+	return true
+
+
 func _collect_group_nodes(node: Node, results: Array[Node]) -> void:
 	if node.is_in_group(target_group):
 		results.append(node)
@@ -240,21 +627,22 @@ func _collect_group_nodes(node: Node, results: Array[Node]) -> void:
 		_collect_group_nodes(child, results)
 
 
-func _get_path_direction(to_target: Vector2) -> Vector2:
+func _get_path_direction(destination: Vector2, fallback_vector: Vector2) -> Vector2:
 	if navigation_agent == null or not use_navigation_agent:
-		return to_target.normalized()
+		return fallback_vector.normalized()
 
-	if path_refresh_remaining == 0.0:
-		navigation_agent.target_position = target.global_position
+	if path_refresh_remaining == 0.0 or navigation_destination.distance_to(destination) > 1.0:
+		navigation_destination = destination
+		navigation_agent.target_position = destination
 		path_refresh_remaining = path_refresh_interval
 
 	if navigation_agent.is_navigation_finished():
-		return to_target.normalized()
+		return fallback_vector.normalized()
 
 	var next_position := navigation_agent.get_next_path_position()
 	var to_next_position := next_position - global_position
 	if to_next_position == Vector2.ZERO:
-		return to_target.normalized()
+		return fallback_vector.normalized()
 	return to_next_position.normalized()
 
 
@@ -268,6 +656,8 @@ func _get_separation_direction() -> Vector2:
 		var other := node as Node2D
 		if other == null or other == self:
 			continue
+		if other.has_method("is_alive") and not other.is_alive():
+			continue
 		var offset := global_position - other.global_position
 		var distance := offset.length()
 		if distance <= 0.0 or distance >= radius:
@@ -278,16 +668,204 @@ func _get_separation_direction() -> Vector2:
 	return separation.normalized() if separation != Vector2.ZERO else Vector2.ZERO
 
 
+func _update_idle_patrol(delta: float) -> void:
+	if not idle_patrol_enabled:
+		state = State.IDLE
+		velocity = Vector2.ZERO
+		_play_idle()
+		return
+
+	idle_patrol_remaining = maxf(idle_patrol_remaining - delta, 0.0)
+	if state == State.PATROL:
+		if idle_patrol_remaining == 0.0:
+			_start_idle()
+			return
+
+		velocity = patrol_direction * get_move_speed() * patrol_speed_scale
+		current_direction = _direction_from_vector(patrol_direction)
+		_play_walk(patrol_direction)
+		return
+
+	state = State.IDLE
+	velocity = Vector2.ZERO
+	_play_idle()
+	if idle_patrol_remaining == 0.0:
+		_start_patrol()
+
+
+func _start_idle() -> void:
+	state = State.IDLE
+	velocity = Vector2.ZERO
+	idle_patrol_remaining = _random_idle_duration()
+	_play_idle()
+
+
+func _start_patrol() -> void:
+	state = State.PATROL
+	patrol_direction = _random_patrol_direction()
+	idle_patrol_remaining = _random_patrol_duration()
+
+
+func _random_idle_duration() -> float:
+	return randf_range(idle_duration_min, maxf(idle_duration_min, idle_duration_max))
+
+
+func _random_patrol_duration() -> float:
+	return randf_range(patrol_duration_min, maxf(patrol_duration_min, patrol_duration_max))
+
+
+func _random_patrol_direction() -> Vector2:
+	var angle := randf() * TAU
+	return Vector2(cos(angle), sin(angle)).normalized()
+
+
 func _set_attack_active(active: bool) -> void:
 	attack_area.monitoring = active
 	attack_shape.disabled = not active
 
 
+func _is_target_in_attack_range(target_node: Node2D) -> bool:
+	return global_position.distance_to(target_node.global_position) <= get_attack_range()
+
+
+func _is_target_in_attack_area(target_node: Node2D) -> bool:
+	if target_node == null:
+		return false
+
+	var attack_rect := _get_collision_shape_global_rect(attack_shape)
+	var target_rect := _get_target_hitbox_global_rect(target_node)
+	if attack_rect.size == Vector2.ZERO:
+		return false
+	if target_rect.size == Vector2.ZERO:
+		return attack_rect.has_point(target_node.global_position)
+	return attack_rect.intersects(target_rect, true)
+
+
+func _get_attack_alignment_direction(to_target: Vector2) -> Vector2:
+	if to_target == Vector2.ZERO:
+		return Vector2.ZERO
+
+	var target_half_size := _get_target_hitbox_half_size(target)
+	var attack_half_size := _get_collision_shape_half_size(attack_shape)
+	var horizontal_lane_half_height := attack_half_size.y + target_half_size.y
+	var vertical_lane_half_width := attack_half_size.x + target_half_size.x
+	var intended_direction := _direction_from_vector(to_target)
+
+	if intended_direction == "side" or intended_direction == "side_left":
+		if absf(to_target.y) > horizontal_lane_half_height:
+			return Vector2(0.0, signf(to_target.y))
+		return Vector2(signf(to_target.x), 0.0)
+
+	if absf(to_target.x) > vertical_lane_half_width:
+		return Vector2(signf(to_target.x), 0.0)
+	return Vector2(0.0, signf(to_target.y))
+
+
+func _sync_attack_area_to_direction() -> void:
+	attack_area.position = _get_attack_area_position_for_direction(current_direction)
+
+
+func _get_attack_area_position_for_direction(direction: String) -> Vector2:
+	var animation_names := [
+		"first_attack_%s" % direction,
+		"idle_%s" % direction,
+		"walk_%s" % direction,
+	]
+	for animation_name in animation_names:
+		var position: Variant = _get_attack_area_position_from_animation(animation_name)
+		if position != null:
+			return position
+	return _default_attack_area_position
+
+
+func _get_attack_area_position_from_animation(animation_name: String) -> Variant:
+	if animation_player == null or not animation_player.has_animation(animation_name):
+		return null
+
+	var animation := animation_player.get_animation(animation_name)
+	for track_index in animation.get_track_count():
+		if animation.track_get_path(track_index) != NodePath("AttackArea2D:position"):
+			continue
+		if animation.track_get_key_count(track_index) == 0:
+			continue
+		return animation.track_get_key_value(track_index, 0)
+	return null
+
+
+func _get_target_hitbox_global_rect(target_node: Node2D) -> Rect2:
+	var hitbox_shape := target_node.get_node_or_null("HitboxArea2D/CollisionShape2D") as CollisionShape2D
+	if hitbox_shape == null:
+		return Rect2()
+	return _get_collision_shape_global_rect(hitbox_shape)
+
+
+func _get_target_hitbox_half_size(target_node: Node2D) -> Vector2:
+	if target_node == null:
+		return Vector2.ZERO
+
+	var hitbox_shape := target_node.get_node_or_null("HitboxArea2D/CollisionShape2D") as CollisionShape2D
+	if hitbox_shape == null:
+		return Vector2.ZERO
+	return _get_collision_shape_half_size(hitbox_shape)
+
+
+func _get_collision_shape_global_rect(collision_shape: CollisionShape2D) -> Rect2:
+	var half_size := _get_collision_shape_half_size(collision_shape)
+	if half_size == Vector2.ZERO:
+		return Rect2()
+	return Rect2(collision_shape.global_position - half_size, half_size * 2.0)
+
+
+func _get_collision_shape_half_size(collision_shape: CollisionShape2D) -> Vector2:
+	if collision_shape == null:
+		return Vector2.ZERO
+
+	var rectangle := collision_shape.shape as RectangleShape2D
+	if rectangle != null:
+		return rectangle.size * 0.5
+
+	var circle := collision_shape.shape as CircleShape2D
+	if circle != null:
+		return Vector2(circle.radius, circle.radius)
+
+	var capsule := collision_shape.shape as CapsuleShape2D
+	if capsule != null:
+		return Vector2(capsule.radius, capsule.height * 0.5)
+
+	return Vector2.ZERO
+
+
+func _cache_lifecycle_defaults() -> void:
+	_default_collision_layer = collision_layer
+	_default_collision_mask = collision_mask
+	_default_hitbox_monitoring = hitbox_area.monitoring
+	_default_hitbox_monitorable = hitbox_area.monitorable
+	_default_attack_area_position = attack_area.position
+
+
+func _disable_combat_logic() -> void:
+	velocity = Vector2.ZERO
+	target = null
+	_hit_targets.clear()
+	remove_from_group("enemy")
+	set_physics_process(false)
+	collision_layer = 0
+	collision_mask = 0
+	hitbox_area.monitoring = false
+	hitbox_area.monitorable = false
+	if animation_player != null:
+		animation_player.stop()
+	_set_attack_active(false)
+
+
 func _apply_attack_hits() -> void:
-	for body in attack_area.get_overlapping_bodies():
-		_try_hit_target(body)
-	for area in attack_area.get_overlapping_areas():
-		_try_hit_target(area)
+	if attack_area.monitoring:
+		for body in attack_area.get_overlapping_bodies():
+			_try_hit_target(body)
+		for area in attack_area.get_overlapping_areas():
+			_try_hit_target(area)
+	if target != null and _is_target_in_attack_area(target):
+		_try_hit_target(target)
 
 
 func _apply_active_attack_hits() -> void:
@@ -340,7 +918,8 @@ func _direction_from_vector(direction: Vector2) -> String:
 	if direction == Vector2.ZERO:
 		return current_direction
 	if absf(direction.x) >= absf(direction.y):
-		return "side_left" if direction.x < 0.0 else "side"
+		last_horizontal_direction = "side_left" if direction.x < 0.0 else "side"
+		return last_horizontal_direction
 	return "up" if direction.y < 0.0 else "down"
 
 
@@ -348,6 +927,36 @@ func _directional_animation_name(animation_name: String) -> String:
 	if animation_name.ends_with("_up") or animation_name.ends_with("_down") or animation_name.ends_with("_side") or animation_name.ends_with("_side_left"):
 		return animation_name
 	return "%s_%s" % [animation_name, current_direction]
+
+
+func _play_death() -> void:
+	var animation_names := _get_death_animation_candidates()
+	if not animation_names.is_empty():
+		sprite.play(animation_names.pick_random())
+		return
+
+	hide()
+
+
+func _get_death_animation_candidates() -> Array[StringName]:
+	var candidates: Array[StringName] = []
+	if sprite.sprite_frames == null:
+		return candidates
+
+	_append_death_animations_for_direction(candidates, current_direction)
+	if candidates.is_empty() and last_horizontal_direction != current_direction:
+		_append_death_animations_for_direction(candidates, last_horizontal_direction)
+	if candidates.is_empty():
+		_append_death_animations_for_direction(candidates, "side")
+	return candidates
+
+
+func _append_death_animations_for_direction(candidates: Array[StringName], direction: String) -> void:
+	var suffix := "_%s" % direction
+	for animation_name in sprite.sprite_frames.get_animation_names():
+		var name := String(animation_name)
+		if name.contains("_death_") and name.ends_with(suffix):
+			candidates.append(animation_name)
 
 
 func _flash_hurt() -> void:

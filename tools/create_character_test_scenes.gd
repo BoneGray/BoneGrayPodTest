@@ -201,17 +201,6 @@ func _add_hitbox(root: Node, hitbox_layer: int, shape_position: Vector2, shape_s
 	shape.set_meta("_edit_lock_", true)
 
 
-func _add_navigation_agent(root: Node) -> void:
-	var navigation_agent := NavigationAgent2D.new()
-	navigation_agent.name = "NavigationAgent2D"
-	navigation_agent.path_desired_distance = 4.0
-	navigation_agent.target_desired_distance = 12.0
-	navigation_agent.radius = 8.0
-	navigation_agent.avoidance_enabled = false
-	root.add_child(navigation_agent)
-	navigation_agent.owner = root
-
-
 func _add_hurt_flash_feedback(root: Node, hurt_flash_script: Script) -> void:
 	var feedback := Node.new()
 	feedback.name = "HurtFlashFeedback"
@@ -219,6 +208,17 @@ func _add_hurt_flash_feedback(root: Node, hurt_flash_script: Script) -> void:
 	root.add_child(feedback)
 	feedback.owner = root
 	feedback.set_meta("_edit_lock_", true)
+
+
+func _add_navigation_agent(root: Node) -> void:
+	var agent := NavigationAgent2D.new()
+	agent.name = "NavigationAgent2D"
+	agent.path_desired_distance = 4.0
+	agent.target_desired_distance = 12.0
+	agent.radius = 8.0
+	agent.avoidance_enabled = false
+	root.add_child(agent)
+	agent.owner = root
 
 
 func _add_animation_player(root: Node, sprite_frames: SpriteFrames, attack_hit_frames: Dictionary, attack_area_offsets: Dictionary) -> void:
@@ -349,8 +349,6 @@ func _create_enemy_test_scene(camera_script: Script) -> bool:
 	root.name = "EnemyTestScene"
 	root.y_sort_enabled = true
 
-	_add_test_navigation_region(root)
-
 	var camera := Camera2D.new()
 	camera.name = "Camera2D"
 	camera.zoom = Vector2(3, 3)
@@ -379,22 +377,6 @@ func _create_enemy_test_scene(camera_script: Script) -> bool:
 		enemy.owner = root
 
 	return _save_scene(_pack_root(root), ENEMY_TEST_SCENE_PATH)
-
-
-func _add_test_navigation_region(root: Node) -> void:
-	var region := NavigationRegion2D.new()
-	region.name = "NavigationRegion2D"
-	var navigation_polygon := NavigationPolygon.new()
-	navigation_polygon.vertices = PackedVector2Array([
-		Vector2(40, 40),
-		Vector2(280, 40),
-		Vector2(280, 220),
-		Vector2(40, 220),
-	])
-	navigation_polygon.add_polygon(PackedInt32Array([0, 1, 2, 3]))
-	region.navigation_polygon = navigation_polygon
-	root.add_child(region)
-	region.owner = root
 
 
 func _update_main_scene() -> bool:

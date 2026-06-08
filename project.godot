@@ -11,8 +11,12 @@ config_version=5
 [application]
 
 config/name="GameZombieWorld"
-run/main_scene="res://scenes/combat_test_scene.tscn"
+run/main_scene="res://scenes/navigation_obstacle_test_scene.tscn"
 config/features=PackedStringArray("4.6", "Forward Plus")
+
+[autoload]
+
+EnemyAttackSlotManager="*res://scripts/enemies/enemy_attack_slot_manager.gd"
 
 [display]
 

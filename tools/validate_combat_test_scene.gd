@@ -50,12 +50,6 @@ func _initialize() -> void:
 		quit(1)
 		return
 
-	if enemy.get_node_or_null("NavigationAgent2D") == null:
-		push_error("Enemy missing NavigationAgent2D.")
-		root.queue_free()
-		quit(1)
-		return
-
 	if player.get_node_or_null("AttackArea2D") == null or enemy.get_node_or_null("HitboxArea2D") == null:
 		push_error("Missing attack or hitbox nodes.")
 		root.queue_free()

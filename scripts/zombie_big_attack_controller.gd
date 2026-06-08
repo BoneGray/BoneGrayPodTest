@@ -38,6 +38,11 @@ var attack_hit_frames := {
 	"second_attack": [2],
 }
 
+var attack_target_limits := {
+	"first_attack": 1,
+	"second_attack": 3,
+}
+
 var attack_area_offsets := {
 	"side": Vector2(10, 1),
 	"side_left": Vector2(-10, 1),
@@ -107,6 +112,7 @@ func play_walk(direction := current_direction) -> void:
 func attack(action := "first_attack", direction := current_direction) -> void:
 	current_direction = direction
 	attack_cooldown_remaining = get_attack_cooldown()
+	set_meta("current_attack_action", action)
 	if attack_log_enabled:
 		print("%s 使用%s攻击，方向 %s" % [get_display_name(), _attack_key_label_for_action(action), current_direction])
 	_hit_targets.clear()
@@ -152,10 +158,24 @@ func _set_attack_active(active: bool) -> void:
 
 
 func _apply_attack_hits() -> void:
-	for body in attack_area.get_overlapping_bodies():
-		_try_hit_target(body)
-	for area in attack_area.get_overlapping_areas():
-		_try_hit_target(area)
+	var max_targets := _get_current_attack_max_targets()
+	if max_targets > 0 and _hit_targets.size() >= max_targets:
+		return
+
+	var hit_targets := _collect_attack_hit_targets()
+	var applied_count := 0
+	for hit_target in hit_targets:
+		if hit_target in _hit_targets:
+			continue
+
+		_hit_targets.append(hit_target)
+		if hit_target.has_method("take_damage"):
+			hit_target.take_damage(get_attack_power())
+		attack_hit.emit(hit_target)
+
+		applied_count += 1
+		if max_targets > 0 and _hit_targets.size() >= max_targets:
+			return
 
 
 func _apply_active_attack_hits() -> void:
@@ -163,15 +183,45 @@ func _apply_active_attack_hits() -> void:
 		_apply_attack_hits()
 
 
-func _try_hit_target(target: Node) -> void:
-	var hit_target := _resolve_hit_target(target)
-	if hit_target == null or hit_target in _hit_targets:
-		return
+func _collect_attack_hit_targets() -> Array[Node]:
+	var hit_targets: Array[Node] = []
+	for body in attack_area.get_overlapping_bodies():
+		_append_hit_target(hit_targets, body)
+	for area in attack_area.get_overlapping_areas():
+		_append_hit_target(hit_targets, area)
+	hit_targets.sort_custom(_sort_attack_targets_by_distance)
+	return hit_targets
 
-	_hit_targets.append(hit_target)
-	if hit_target.has_method("take_damage"):
-		hit_target.take_damage(get_attack_power())
-	attack_hit.emit(hit_target)
+
+func _append_hit_target(hit_targets: Array[Node], candidate: Node) -> void:
+	var hit_target := _resolve_hit_target(candidate)
+	if hit_target == null or hit_target in hit_targets:
+		return
+	hit_targets.append(hit_target)
+
+
+func _sort_attack_targets_by_distance(a: Node, b: Node) -> bool:
+	return _attack_target_distance_squared(a) < _attack_target_distance_squared(b)
+
+
+func _attack_target_distance_squared(target: Node) -> float:
+	var target_node := target as Node2D
+	if target_node == null:
+		return INF
+	return attack_area.global_position.distance_squared_to(target_node.global_position)
+
+
+func _get_current_attack_max_targets() -> int:
+	var action := String(get_meta("current_attack_action", "first_attack"))
+	return attack_target_limits.get(action, 1)
+
+
+func _get_current_attack_hit_count() -> int:
+	return _hit_targets.size()
+
+
+func _reset_current_attack_hits() -> void:
+	_hit_targets.clear()
 
 
 func _resolve_hit_target(target: Node) -> Node:
@@ -270,6 +320,10 @@ func get_max_health() -> int:
 
 func get_current_health() -> int:
 	return health
+
+
+func is_alive() -> bool:
+	return health > 0
 
 
 func get_display_name() -> String:

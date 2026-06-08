@@ -1,9 +1,9 @@
-[gd_scene format=3]
+[gd_scene format=3 uid="uid://b42o1nwn1h7ag"]
 
-[ext_resource type="Script" path="res://scripts/zombie_big_attack_controller.gd" id="1_yewv4"]
-[ext_resource type="SpriteFrames" path="res://resources/characters/player/player_sprite_frames.tres" id="2_76oj4"]
+[ext_resource type="Script" uid="uid://dmbarady6skoe" path="res://scripts/zombie_big_attack_controller.gd" id="1_yewv4"]
+[ext_resource type="SpriteFrames" uid="uid://dn4ce668swcf5" path="res://resources/characters/player/player_sprite_frames.tres" id="2_76oj4"]
 [ext_resource type="Resource" path="res://resources/characters/player/player_stats.tres" id="3_player_stats"]
-[ext_resource type="Script" path="res://scripts/combat/hurt_flash_feedback.gd" id="4_hurt_flash"]
+[ext_resource type="Script" uid="uid://bu867rg6booq6" path="res://scripts/combat/hurt_flash_feedback.gd" id="4_hurt_flash"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_dyp2m"]
 size = Vector2(8, 10)
@@ -2000,7 +2000,6 @@ _data = {
 
 [node name="Player" type="CharacterBody2D" unique_id=1892881530 groups=["player"]]
 collision_layer = 2
-collision_mask = 1
 script = ExtResource("1_yewv4")
 stats = ExtResource("3_player_stats")
 target_group = "enemy"
@@ -2008,7 +2007,7 @@ camera_follow_enabled = false
 
 [node name="Sprite" type="AnimatedSprite2D" parent="." unique_id=1039052212]
 sprite_frames = ExtResource("2_76oj4")
-animation = &"idle_down"
+animation = &"first_attack_down"
 
 [node name="BodyCollisionShape2D" type="CollisionShape2D" parent="." unique_id=798487053]
 position = Vector2(0, 3)
@@ -2025,7 +2024,7 @@ shape = SubResource("RectangleShape2D_atpat")
 metadata/_edit_lock_ = true
 
 [node name="AttackArea2D" type="Area2D" parent="." unique_id=1731251055]
-position = Vector2(10, 1)
+position = Vector2(0, 8)
 collision_layer = 0
 collision_mask = 16
 monitoring = false

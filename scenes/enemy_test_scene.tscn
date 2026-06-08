@@ -7,15 +7,8 @@
 [ext_resource type="Script" path="res://scripts/enemies/base_enemy.gd" id="5_yswyb"]
 [ext_resource type="Resource" path="res://resources/characters/enemies/zombie_big_stats.tres" id="6_w4tvi"]
 
-[sub_resource type="NavigationPolygon" id="NavigationPolygon_6oyhd"]
-vertices = PackedVector2Array(40, 40, 280, 40, 280, 220, 40, 220)
-polygons = Array[PackedInt32Array]([PackedInt32Array(0, 1, 2, 3)])
-
 [node name="EnemyTestScene" type="Node2D" unique_id=729363739]
 y_sort_enabled = true
-
-[node name="NavigationRegion2D" type="NavigationRegion2D" parent="." unique_id=19235143]
-navigation_polygon = SubResource("NavigationPolygon_6oyhd")
 
 [node name="Camera2D" type="Camera2D" parent="." unique_id=1729233796]
 zoom = Vector2(3, 3)

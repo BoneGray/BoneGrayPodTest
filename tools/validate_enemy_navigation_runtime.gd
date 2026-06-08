@@ -38,13 +38,6 @@ func _run() -> void:
 			quit(1)
 			return
 
-		var navigation_agent := enemy.get_node_or_null("NavigationAgent2D") as NavigationAgent2D
-		if navigation_agent == null:
-			push_error("%s missing NavigationAgent2D." % enemy.name)
-			root.queue_free()
-			quit(1)
-			return
-
 		var velocity := enemy.get("velocity") as Vector2
 		if velocity == Vector2.ZERO and enemy.global_position.distance_to(player.global_position) > enemy.get("stats").attack_range:
 			push_error("%s did not start moving toward Player." % enemy.name)
