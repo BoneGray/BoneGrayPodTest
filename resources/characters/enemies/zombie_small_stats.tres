@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="EnemyStats" format=3 uid="uid://drsdbfoaa5nul"]
+
+[ext_resource type="Script" uid="uid://djibwqa6eumc2" path="res://scripts/enemies/enemy_stats.gd" id="1_enemy_stats"]
+
+[resource]
+script = ExtResource("1_enemy_stats")
+display_name = "Zombie Small"
+max_health = 18
+move_speed = 56.0
+attack_power = 5
+attack_actions = Array[String](["attack_first", "attack_second"])
+attack_profiles = {
+"attack_second": {
+"cross_distance": 18.0,
+"cross_duration": 0.45,
+"hit_detection": "body_motion",
+"max_range": 56.0,
+"min_range": 12.0,
+"recovery": 0.25,
+"type": "cross"
+}
+}
+detect_range = 66.0
+lose_target_range = 84.0
+attack_range = 16.0
+attack_cooldown = 0.9
+separation_radius = 14.0

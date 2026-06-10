@@ -1,7 +1,8 @@
 @tool
 extends SceneTree
 
-const PLAYER_SPRITE_FRAMES_PATH := "res://resources/characters/player/player_sprite_frames.tres"
+const PLAYER_SPRITE_FRAMES_PATH := "res://resources/characters/player/player_no_hands_sprite_frames.tres"
+const PLAYER_HANDS_SPRITE_FRAMES_PATH := "res://resources/characters/player/player_hands_sprite_frames.tres"
 const ENEMY_SPRITE_FRAMES_PATH := "res://resources/characters/enemies/zombie_big_sprite_frames.tres"
 const PLAYER_SCRIPT_PATH := "res://scripts/zombie_big_attack_controller.gd"
 const PLAYER_STATS_PATH := "res://resources/characters/player/player_stats.tres"
@@ -16,13 +17,13 @@ const ENEMY_TEST_SCENE_PATH := "res://scenes/enemy_test_scene.tscn"
 const MAIN_SCENE_PATH := "res://scenes/myScene.tscn"
 
 const PLAYER_ATTACK_HIT_FRAMES := {
-	"first_attack": [2],
-	"second_attack": [2],
+	"attack_first": [2],
+	"attack_second": [2],
 }
 
 const ENEMY_ATTACK_HIT_FRAMES := {
-	"first_attack": [4],
-	"second_attack": [7, 8],
+	"attack_first": [4],
+	"attack_second": [7, 8],
 }
 
 const PLAYER_BODY_POSITION := Vector2(0, 3)
@@ -62,6 +63,7 @@ func _initialize() -> void:
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://scenes/characters"))
 
 	var player_sprite_frames := load(PLAYER_SPRITE_FRAMES_PATH) as SpriteFrames
+	var player_hands_sprite_frames := load(PLAYER_HANDS_SPRITE_FRAMES_PATH) as SpriteFrames
 	var enemy_sprite_frames := load(ENEMY_SPRITE_FRAMES_PATH) as SpriteFrames
 	var player_script := load(PLAYER_SCRIPT_PATH) as Script
 	var player_stats := load(PLAYER_STATS_PATH) as Resource
@@ -69,12 +71,12 @@ func _initialize() -> void:
 	var enemy_stats := load(ENEMY_STATS_PATH) as Resource
 	var hurt_flash_script := load(HURT_FLASH_SCRIPT_PATH) as Script
 	var camera_script := load(CAMERA_SCRIPT_PATH) as Script
-	if player_sprite_frames == null or enemy_sprite_frames == null or player_script == null or player_stats == null or enemy_script == null or enemy_stats == null or hurt_flash_script == null or camera_script == null:
+	if player_sprite_frames == null or player_hands_sprite_frames == null or enemy_sprite_frames == null or player_script == null or player_stats == null or enemy_script == null or enemy_stats == null or hurt_flash_script == null or camera_script == null:
 		push_error("Missing character scene dependency.")
 		quit(1)
 		return
 
-	if not _save_scene(_create_player_scene(player_sprite_frames, player_script, player_stats, hurt_flash_script), PLAYER_SCENE_PATH):
+	if not _save_scene(_create_player_scene(player_sprite_frames, player_hands_sprite_frames, player_script, player_stats, hurt_flash_script), PLAYER_SCENE_PATH):
 		quit(1)
 		return
 
@@ -98,7 +100,7 @@ func _initialize() -> void:
 	quit()
 
 
-func _create_player_scene(sprite_frames: SpriteFrames, player_script: Script, player_stats: Resource, hurt_flash_script: Script) -> PackedScene:
+func _create_player_scene(sprite_frames: SpriteFrames, hands_sprite_frames: SpriteFrames, player_script: Script, player_stats: Resource, hurt_flash_script: Script) -> PackedScene:
 	var player := CharacterBody2D.new()
 	player.name = "Player"
 	player.set_script(player_script)
@@ -110,6 +112,7 @@ func _create_player_scene(sprite_frames: SpriteFrames, player_script: Script, pl
 	player.add_to_group("player", true)
 
 	_add_sprite(player, sprite_frames)
+	_add_hands_sprite(player, hands_sprite_frames)
 	_add_body_collision(player, PLAYER_BODY_POSITION, PLAYER_BODY_SIZE)
 	_add_hitbox(player, PLAYER_HITBOX_LAYER, PLAYER_HITBOX_POSITION, PLAYER_HITBOX_SIZE)
 	_add_attack_area(player, PLAYER_ATTACK_AREA_POSITION, PLAYER_ATTACK_AREA_SIZE, ENEMY_HITBOX_LAYER)
@@ -141,6 +144,16 @@ func _create_enemy_scene(sprite_frames: SpriteFrames, enemy_script: Script, enem
 func _add_sprite(root: Node, sprite_frames: SpriteFrames) -> void:
 	var sprite := AnimatedSprite2D.new()
 	sprite.name = "Sprite"
+	sprite.sprite_frames = sprite_frames
+	sprite.animation = &"idle_down"
+	sprite.centered = true
+	root.add_child(sprite)
+	sprite.owner = root
+
+
+func _add_hands_sprite(root: Node, sprite_frames: SpriteFrames) -> void:
+	var sprite := AnimatedSprite2D.new()
+	sprite.name = "HandsSprite"
 	sprite.sprite_frames = sprite_frames
 	sprite.animation = &"idle_down"
 	sprite.centered = true
@@ -230,12 +243,14 @@ func _add_animation_player(root: Node, sprite_frames: SpriteFrames, attack_hit_f
 	animation_player.set_meta("_edit_lock_", true)
 
 	var library := AnimationLibrary.new()
+	var hands_sprite := root.get_node_or_null("HandsSprite") as AnimatedSprite2D
+	var hands_sprite_frames := hands_sprite.sprite_frames if hands_sprite != null else null
 	for animation_name in sprite_frames.get_animation_names():
-		library.add_animation(animation_name, _create_animation(animation_name, sprite_frames, attack_hit_frames, attack_area_offsets))
+		library.add_animation(animation_name, _create_animation(animation_name, sprite_frames, hands_sprite_frames, attack_hit_frames, attack_area_offsets))
 	animation_player.add_animation_library("", library)
 
 
-func _create_animation(animation_name: StringName, sprite_frames: SpriteFrames, attack_hit_frames: Dictionary, attack_area_offsets: Dictionary) -> Animation:
+func _create_animation(animation_name: StringName, sprite_frames: SpriteFrames, hands_sprite_frames: SpriteFrames, attack_hit_frames: Dictionary, attack_area_offsets: Dictionary) -> Animation:
 	var animation := Animation.new()
 	var frame_count := sprite_frames.get_frame_count(animation_name)
 	var speed := sprite_frames.get_animation_speed(animation_name)
@@ -245,9 +260,16 @@ func _create_animation(animation_name: StringName, sprite_frames: SpriteFrames, 
 
 	_add_value_key(animation, NodePath("Sprite:animation"), 0.0, animation_name)
 	_add_value_key(animation, NodePath("Sprite:playing"), 0.0, true)
+	var has_hands_animation := hands_sprite_frames != null and hands_sprite_frames.has_animation(animation_name)
+	if has_hands_animation:
+		_add_value_key(animation, NodePath("HandsSprite:animation"), 0.0, animation_name)
+		_add_value_key(animation, NodePath("HandsSprite:playing"), 0.0, true)
 	_add_value_key(animation, NodePath("AttackArea2D:position"), 0.0, _attack_area_position_for_animation(animation_name, attack_area_offsets))
 	for frame_index in frame_count:
 		_add_value_key(animation, NodePath("Sprite:frame"), float(frame_index) / speed, frame_index)
+		if has_hands_animation:
+			var hands_frame := mini(frame_index, hands_sprite_frames.get_frame_count(animation_name) - 1)
+			_add_value_key(animation, NodePath("HandsSprite:frame"), float(frame_index) / speed, hands_frame)
 
 	var action_name := _action_from_animation(animation_name)
 	if attack_hit_frames.has(action_name):
@@ -290,11 +312,10 @@ func _get_or_add_value_track(animation: Animation, path: NodePath) -> int:
 
 func _action_from_animation(animation_name: StringName) -> String:
 	var name := String(animation_name)
-	if name.begins_with("first_attack_"):
-		return "first_attack"
-	if name.begins_with("second_attack_"):
-		return "second_attack"
-	return name
+	var parts := name.split("_", false)
+	if parts.size() >= 3 and (parts[0] in ["attack", "death"]):
+		return "%s_%s" % [parts[0], parts[parts.size() - 1]]
+	return parts[0] if not parts.is_empty() else name
 
 
 func _attack_area_position_for_animation(animation_name: StringName, attack_area_offsets: Dictionary) -> Vector2:
@@ -304,6 +325,15 @@ func _attack_area_position_for_animation(animation_name: StringName, attack_area
 
 func _direction_from_animation(animation_name: StringName) -> String:
 	var name := String(animation_name)
+	var parts := name.split("_", false)
+	if parts.size() >= 4 and parts[1] == "side" and parts[2] == "left":
+		return "side_left"
+	if parts.size() >= 2 and parts[1] == "side":
+		return "side"
+	if parts.size() >= 2 and parts[1] == "down":
+		return "down"
+	if parts.size() >= 2 and parts[1] == "up":
+		return "up"
 	if name.ends_with("_side_left"):
 		return "side_left"
 	if name.ends_with("_side"):

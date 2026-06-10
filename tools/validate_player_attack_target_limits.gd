@@ -58,7 +58,7 @@ func _run() -> void:
 		quit(1)
 		return
 
-	player.set_meta("current_attack_action", "first_attack")
+	player.set_meta("current_attack_action", "attack_first")
 	if player.call("_get_current_attack_max_targets") != 1:
 		push_error("First attack should hit only 1 target.")
 		root.queue_free()
@@ -76,7 +76,7 @@ func _run() -> void:
 		quit(1)
 		return
 
-	player.set_meta("current_attack_action", "second_attack")
+	player.set_meta("current_attack_action", "attack_second")
 	if player.call("_get_current_attack_max_targets") != 3:
 		push_error("Second attack should support 3 targets.")
 		root.queue_free()

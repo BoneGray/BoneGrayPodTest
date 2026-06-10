@@ -20,6 +20,7 @@ signal died(player: Node)
 @export var attack_log_enabled := true
 
 @onready var sprite: AnimatedSprite2D = $Sprite
+@onready var hands_sprite: AnimatedSprite2D = get_node_or_null("HandsSprite")
 @onready var attack_area: Area2D = $AttackArea2D
 @onready var attack_shape: CollisionShape2D = $AttackArea2D/CollisionShape2D
 @onready var follow_camera: Camera2D = get_node_or_null("FollowCamera2D")
@@ -30,17 +31,19 @@ var current_direction := "side"
 var health := 1
 var attack_cooldown_remaining := 0.0
 var invincible_time_remaining := 0.0
+var stun_time_remaining := 0.0
 var _hit_targets: Array[Node] = []
 var _attack_active := false
+var _equipment_visual_enabled := true
 
 var attack_hit_frames := {
-	"first_attack": [2],
-	"second_attack": [2],
+	"attack_first": [2],
+	"attack_second": [2],
 }
 
 var attack_target_limits := {
-	"first_attack": 1,
-	"second_attack": 3,
+	"attack_first": 1,
+	"attack_second": 3,
 }
 
 var attack_area_offsets := {
@@ -64,11 +67,18 @@ func _ready() -> void:
 	health_changed.emit(health, get_max_health())
 
 
+func _process(_delta: float) -> void:
+	_sync_equipment_visual_to_sprite()
+
+
 func _physics_process(delta: float) -> void:
 	attack_cooldown_remaining = maxf(attack_cooldown_remaining - delta, 0.0)
 	invincible_time_remaining = maxf(invincible_time_remaining - delta, 0.0)
-	if not keyboard_control_enabled or _is_locked_animation():
+	stun_time_remaining = maxf(stun_time_remaining - delta, 0.0)
+	if not keyboard_control_enabled or _is_locked_animation() or is_stunned():
 		velocity = Vector2.ZERO
+		if is_stunned() and not _is_locked_animation():
+			play_idle(current_direction)
 		move_and_slide()
 		_apply_active_attack_hits()
 		return
@@ -89,14 +99,14 @@ func _physics_process(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not keyboard_control_enabled or _is_locked_animation():
+	if not keyboard_control_enabled or _is_locked_animation() or is_stunned():
 		return
 	if attack_cooldown_remaining > 0.0:
 		return
 	if _is_key_pressed(event, primary_attack_key):
-		attack("first_attack", current_direction)
+		attack("attack_first", current_direction)
 	elif _is_key_pressed(event, secondary_attack_key):
-		attack("second_attack", current_direction)
+		attack("attack_second", current_direction)
 
 
 func play_idle(direction := current_direction) -> void:
@@ -109,7 +119,7 @@ func play_walk(direction := current_direction) -> void:
 	_play_animation_if_changed("walk_%s" % current_direction)
 
 
-func attack(action := "first_attack", direction := current_direction) -> void:
+func attack(action := "attack_first", direction := current_direction) -> void:
 	current_direction = direction
 	attack_cooldown_remaining = get_attack_cooldown()
 	set_meta("current_attack_action", action)
@@ -117,15 +127,18 @@ func attack(action := "first_attack", direction := current_direction) -> void:
 		print("%s 使用%s攻击，方向 %s" % [get_display_name(), _attack_key_label_for_action(action), current_direction])
 	_hit_targets.clear()
 	_set_attack_active(false)
-	var animation_name := "%s_%s" % [action, current_direction]
+	var animation_name := _animation_name(action, current_direction)
 	if animation_player != null and animation_player.has_animation(animation_name):
 		animation_player.play(animation_name)
+		_sync_equipment_visual_to_animation(animation_name)
 	elif sprite.sprite_frames != null and sprite.sprite_frames.has_animation(animation_name):
 		sprite.play(animation_name)
+		_sync_equipment_visual_to_sprite()
 
 
 func _on_frame_changed() -> void:
 	_update_direction_from_animation()
+	_sync_equipment_visual_to_sprite()
 	var action_name := _action_from_animation(sprite.animation)
 	if not attack_hit_frames.has(action_name):
 		_set_attack_active(false)
@@ -140,13 +153,13 @@ func _on_frame_changed() -> void:
 
 func _on_animation_finished() -> void:
 	_set_attack_active(false)
-	if _action_from_animation(sprite.animation).ends_with("_attack"):
+	if _action_from_animation(sprite.animation).begins_with("attack_"):
 		play_idle(current_direction)
 
 
 func _on_animation_player_finished(animation_name: StringName) -> void:
 	_set_attack_active(false)
-	if _action_from_animation(animation_name).ends_with("_attack"):
+	if _action_from_animation(animation_name).begins_with("attack_"):
 		play_idle(current_direction)
 
 
@@ -212,7 +225,7 @@ func _attack_target_distance_squared(target: Node) -> float:
 
 
 func _get_current_attack_max_targets() -> int:
-	var action := String(get_meta("current_attack_action", "first_attack"))
+	var action := String(get_meta("current_attack_action", "attack_first"))
 	return attack_target_limits.get(action, 1)
 
 
@@ -234,14 +247,14 @@ func _resolve_hit_target(target: Node) -> Node:
 
 
 func _update_direction_from_animation() -> void:
-	var animation_name := String(sprite.animation)
-	if animation_name.ends_with("_side_left"):
+	var animation_name := _direction_from_animation(sprite.animation)
+	if animation_name == "side_left":
 		current_direction = "side_left"
-	elif animation_name.ends_with("_side"):
+	elif animation_name == "side":
 		current_direction = "side"
-	elif animation_name.ends_with("_down"):
+	elif animation_name == "down":
 		current_direction = "down"
-	elif animation_name.ends_with("_up"):
+	elif animation_name == "up":
 		current_direction = "up"
 
 
@@ -252,21 +265,10 @@ func _update_attack_area_transform() -> void:
 
 func _action_from_animation(animation_name: StringName) -> String:
 	var name := String(animation_name)
-	if name.begins_with("first_attack_"):
-		return "first_attack"
-	if name.begins_with("second_attack_"):
-		return "second_attack"
-	if name.begins_with("first_death_"):
-		return "first_death"
-	if name.begins_with("second_death_"):
-		return "second_death"
-	if name.begins_with("third_death_"):
-		return "third_death"
-	if name.begins_with("idle_"):
-		return "idle"
-	if name.begins_with("walk_"):
-		return "walk"
-	return name
+	var parts := name.split("_", false)
+	if parts.size() >= 3 and (parts[0] in ["attack", "death"]):
+		return "%s_%s" % [parts[0], parts[parts.size() - 1]]
+	return parts[0] if not parts.is_empty() else name
 
 
 func _configure_camera() -> void:
@@ -282,6 +284,23 @@ func configure_stats(new_stats: Resource) -> void:
 	stats = new_stats
 	health = get_max_health()
 	health_changed.emit(health, get_max_health())
+
+
+func equip_weapon_visual(sprite_frames: SpriteFrames) -> void:
+	if hands_sprite == null:
+		return
+
+	_equipment_visual_enabled = true
+	hands_sprite.sprite_frames = sprite_frames
+	_sync_equipment_visual_to_sprite()
+
+
+func clear_weapon_visual() -> void:
+	if hands_sprite == null:
+		return
+
+	_equipment_visual_enabled = false
+	hands_sprite.hide()
 
 
 func take_damage(amount: int) -> void:
@@ -305,10 +324,11 @@ func die() -> void:
 
 	velocity = Vector2.ZERO
 	_set_attack_active(false)
-	if sprite.sprite_frames != null and sprite.sprite_frames.has_animation("first_death_%s" % current_direction):
-		sprite.play("first_death_%s" % current_direction)
-	elif sprite.sprite_frames != null and sprite.sprite_frames.has_animation("first_death_side"):
-		sprite.play("first_death_side")
+	var death_animation := _animation_name("death_first", current_direction)
+	if sprite.sprite_frames != null and sprite.sprite_frames.has_animation(death_animation):
+		sprite.play(death_animation)
+	elif sprite.sprite_frames != null and sprite.sprite_frames.has_animation("death_side_first"):
+		sprite.play("death_side_first")
 	else:
 		hide()
 	died.emit(self)
@@ -324,6 +344,20 @@ func get_current_health() -> int:
 
 func is_alive() -> bool:
 	return health > 0
+
+
+func apply_status_effect(effect_name: String, duration: float, _source: Node = null) -> void:
+	if health <= 0:
+		return
+	if effect_name == "stun":
+		stun_time_remaining = maxf(stun_time_remaining, duration)
+		velocity = Vector2.ZERO
+		_set_attack_active(false)
+		play_idle(current_direction)
+
+
+func is_stunned() -> bool:
+	return stun_time_remaining > 0.0
 
 
 func get_display_name() -> String:
@@ -343,9 +377,9 @@ func get_attack_power() -> int:
 
 
 func _attack_key_label_for_action(action: String) -> String:
-	if action == "first_attack":
+	if action == "attack_first":
 		return "J"
-	if action == "second_attack":
+	if action == "attack_second":
 		return "K"
 	return action
 
@@ -390,7 +424,7 @@ func _is_key_pressed(event: InputEvent, key: int) -> bool:
 
 func _is_locked_animation() -> bool:
 	var action_name := _action_from_animation(sprite.animation)
-	return action_name.ends_with("_attack") or action_name.ends_with("_death")
+	return action_name.begins_with("attack_") or action_name.begins_with("death_")
 
 
 func _play_animation_if_changed(animation_name: String) -> void:
@@ -398,6 +432,62 @@ func _play_animation_if_changed(animation_name: String) -> void:
 		return
 	if sprite.sprite_frames != null and sprite.sprite_frames.has_animation(animation_name):
 		sprite.play(animation_name)
+		_sync_equipment_visual_to_sprite()
+
+
+func _animation_name(action: String, direction: String) -> String:
+	var parts := action.split("_", false, 1)
+	if parts.size() == 2 and (parts[0] in ["attack", "death"]):
+		return "%s_%s_%s" % [parts[0], direction, parts[1]]
+	return "%s_%s" % [action, direction]
+
+
+func _direction_from_animation(animation_name: StringName) -> String:
+	var name := String(animation_name)
+	var parts := name.split("_", false)
+	if parts.size() >= 3 and parts[1] == "side" and parts[2] == "left":
+		return "side_left"
+	if parts.size() >= 2 and parts[1] == "side":
+		return "side"
+	if parts.size() >= 2 and parts[1] == "down":
+		return "down"
+	if parts.size() >= 2 and parts[1] == "up":
+		return "up"
+	if name.ends_with("_side_left"):
+		return "side_left"
+	if name.ends_with("_side"):
+		return "side"
+	if name.ends_with("_down"):
+		return "down"
+	if name.ends_with("_up"):
+		return "up"
+	return current_direction
+
+
+func _sync_equipment_visual_to_sprite() -> void:
+	if hands_sprite == null or hands_sprite.sprite_frames == null or not _equipment_visual_enabled:
+		return
+
+	_sync_equipment_visual_to_animation(String(sprite.animation), sprite.frame, sprite.is_playing())
+
+
+func _sync_equipment_visual_to_animation(animation_name: String, frame := 0, playing := true) -> void:
+	if hands_sprite == null or hands_sprite.sprite_frames == null or not _equipment_visual_enabled:
+		return
+
+	if not hands_sprite.sprite_frames.has_animation(animation_name):
+		hands_sprite.hide()
+		return
+
+	hands_sprite.show()
+	if hands_sprite.animation != StringName(animation_name):
+		hands_sprite.animation = StringName(animation_name)
+	hands_sprite.frame = mini(frame, hands_sprite.sprite_frames.get_frame_count(animation_name) - 1)
+	hands_sprite.speed_scale = sprite.speed_scale
+	if playing and not hands_sprite.is_playing():
+		hands_sprite.play()
+	elif not playing and hands_sprite.is_playing():
+		hands_sprite.stop()
 
 
 func _flash_hurt() -> void:

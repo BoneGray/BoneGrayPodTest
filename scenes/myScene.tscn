@@ -3,6 +3,7 @@
 [ext_resource type="TileSet" path="res://resources/tiles/background_bleak_yellow_tileset.tres" id="1_k2xjl"]
 [ext_resource type="Script" path="res://scripts/time_of_day_tileset_switcher.gd" id="2_switch"]
 [ext_resource type="PackedScene" path="res://scenes/characters/player.tscn" id="3_xljl3"]
+[ext_resource type="Resource" path="res://resources/characters/player/player_stats.tres" id="5_sxfrq"]
 [ext_resource type="PackedScene" path="res://scenes/characters/enemy.tscn" id="6_sxfrq"]
 [ext_resource type="Script" path="res://scripts/enemies/base_enemy.gd" id="6_xljl3"]
 [ext_resource type="Resource" path="res://resources/characters/enemies/zombie_big_stats.tres" id="7_sxfrq"]
@@ -20,13 +21,16 @@ tile_set = ExtResource("1_k2xjl")
 [node name="Node" type="Node2D" parent="." unique_id=1084670665]
 y_sort_enabled = true
 
-[node name="Player" type="CharacterBody2D" parent="Node" unique_id=1892881530 groups=["player"] instance=ExtResource("3_xljl3")]
+[node name="Player" type="CharacterBody2D" parent="Node" unique_id=1160340334 groups=["player"] instance=ExtResource("3_xljl3")]
 position = Vector2(219, 166.75)
+collision_layer = 2
 script = ExtResource("8_e02kk")
+stats = ExtResource("5_sxfrq")
 target_group = "enemy"
 camera_follow_enabled = false
 
-[node name="Enemy" type="CharacterBody2D" parent="Node" unique_id=1688546181 groups=["enemy"] instance=ExtResource("6_sxfrq")]
+[node name="Enemy" type="CharacterBody2D" parent="Node" unique_id=1305528959 groups=["enemy"] instance=ExtResource("6_sxfrq")]
 position = Vector2(283, 166.75)
+collision_layer = 4
 script = ExtResource("6_xljl3")
 stats = ExtResource("7_sxfrq")

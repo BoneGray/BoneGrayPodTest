@@ -1,13 +1,7 @@
-[gd_resource type="Resource" script_class="PlayerStats" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="PlayerStats" format=3 uid="uid://bam0vko154jq6"]
 
-[ext_resource type="Script" path="res://scripts/player/player_stats.gd" id="1_player_stats"]
+[ext_resource type="Script" uid="uid://b6fcu4f442g0o" path="res://scripts/player/player_stats.gd" id="1_player_stats"]
 
 [resource]
 script = ExtResource("1_player_stats")
-display_name = "Player"
-max_health = 100
-move_speed = 90.0
-defense = 0
-attack_power = 10
-attack_cooldown = 0.35
-invincible_time = 0.35
+max_health = 1030

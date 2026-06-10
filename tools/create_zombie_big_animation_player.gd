@@ -5,8 +5,8 @@ const SCENE_PATH := "res://scenes/myScene.tscn"
 const PLAYER_PATH := "Node/Player"
 
 const ATTACK_HIT_FRAMES := {
-	"first_attack": [2],
-	"second_attack": [2],
+	"attack_first": [2],
+	"attack_second": [2],
 }
 
 const ATTACK_AREA_OFFSETS := {
@@ -133,19 +133,10 @@ func _get_or_add_value_track(animation: Animation, path: NodePath) -> int:
 
 func _action_from_animation(animation_name: StringName) -> String:
 	var name := String(animation_name)
-	if name.begins_with("first_attack_"):
-		return "first_attack"
-	if name.begins_with("second_attack_"):
-		return "second_attack"
-	if name.begins_with("first_death_"):
-		return "first_death"
-	if name.begins_with("second_death_"):
-		return "second_death"
-	if name.begins_with("idle_"):
-		return "idle"
-	if name.begins_with("walk_"):
-		return "walk"
-	return name
+	var parts := name.split("_", false)
+	if parts.size() >= 3 and (parts[0] in ["attack", "death"]):
+		return "%s_%s" % [parts[0], parts[parts.size() - 1]]
+	return parts[0] if not parts.is_empty() else name
 
 
 func _attack_area_position_for_animation(animation_name: StringName) -> Vector2:
@@ -155,6 +146,15 @@ func _attack_area_position_for_animation(animation_name: StringName) -> Vector2:
 
 func _direction_from_animation(animation_name: StringName) -> String:
 	var name := String(animation_name)
+	var parts := name.split("_", false)
+	if parts.size() >= 4 and parts[1] == "side" and parts[2] == "left":
+		return "side_left"
+	if parts.size() >= 2 and parts[1] == "side":
+		return "side"
+	if parts.size() >= 2 and parts[1] == "down":
+		return "down"
+	if parts.size() >= 2 and parts[1] == "up":
+		return "up"
 	if name.ends_with("_side_left"):
 		return "side_left"
 	if name.ends_with("_side"):

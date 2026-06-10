@@ -2,7 +2,7 @@
 extends SceneTree
 
 const SCENE_PATH := "res://scenes/myScene.tscn"
-const TEST_ANIMATION := &"first_attack_side_left"
+const TEST_ANIMATION := &"attack_side_left_first"
 
 
 func _initialize() -> void:

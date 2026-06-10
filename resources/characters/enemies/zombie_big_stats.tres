@@ -6,4 +6,13 @@
 script = ExtResource("1_enemy_stats")
 display_name = "Zombie Big"
 move_speed = 42.0
+attack_actions = Array[String](["attack_first", "attack_second"])
+attack_profiles = {
+"attack_second": {
+"recovery": 0.45,
+"status_duration": 0.8,
+"status_effect": "stun",
+"type": "melee"
+}
+}
 knockback_resistance = 0.1

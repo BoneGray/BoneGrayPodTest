@@ -33,8 +33,9 @@ const ATTACK_SLOT_DIRECTIONS := [
 @export var direct_chase_range := 48.0
 @export var attack_slot_start_range_padding := 24.0
 @export var attack_slot_exit_range_padding := 36.0
-@export var attack_slot_arrive_distance := 2.0
+@export var attack_slot_arrive_distance := 6.0
 @export var attack_slot_timeout := 1.0
+@export var attack_slot_progress_epsilon := 0.5
 @export var attack_slot_reachable_distance := 10.0
 @export var idle_patrol_enabled := true
 @export var idle_duration_min := 0.8
@@ -66,9 +67,16 @@ var attack_slot_direction := "down"
 var attack_slot_position := Vector2.ZERO
 var has_attack_slot := false
 var attack_slot_elapsed := 0.0
+var attack_slot_stuck_elapsed := 0.0
+var attack_slot_last_distance := INF
 var attack_slot_excluded_directions: Array[String] = []
 var attack_elapsed := 0.0
 var current_attack_action := ""
+var current_attack_type := "melee"
+var current_attack_profile := {}
+var leap_start_position := Vector2.ZERO
+var leap_end_position := Vector2.ZERO
+var leap_duration := 0.0
 var _hit_targets: Array[Node] = []
 var _default_collision_layer := 0
 var _default_collision_mask := 0
@@ -78,13 +86,13 @@ var _default_attack_area_position := Vector2.ZERO
 var _attack_slot_manager: Node
 
 var attack_hit_frames := {
-	"first_attack": [4],
-	"second_attack": [7, 8],
+	"attack_first": [4],
+	"attack_second": [7, 8],
 }
 
 var attack_hit_windows := {
-	"first_attack": [Vector2(0.2, 0.65)],
-	"second_attack": [Vector2(0.3, 0.9)],
+	"attack_first": [Vector2(0.2, 0.65)],
+	"attack_second": [Vector2(0.3, 0.9)],
 }
 
 
@@ -105,6 +113,7 @@ func _physics_process(delta: float) -> void:
 		velocity = Vector2.ZERO
 		return
 
+	var previous_position := global_position
 	attack_cooldown_remaining = maxf(attack_cooldown_remaining - delta, 0.0)
 	path_refresh_remaining = maxf(path_refresh_remaining - delta, 0.0)
 	if state == State.ATTACK:
@@ -122,8 +131,8 @@ func _physics_process(delta: float) -> void:
 	if state == State.CHASE or state == State.APPROACH_ATTACK_SLOT:
 		_update_combat_movement(delta)
 	elif state == State.ATTACK:
-		velocity = Vector2.ZERO
-		if _is_current_attack_hit_window():
+		_update_attack_motion(delta)
+		if not _uses_body_motion_hit_detection() and _is_current_attack_hit_window():
 			_sync_attack_area_to_direction()
 			_apply_attack_hits()
 		if not _is_attack_animation_playing() and not attack_area.monitoring:
@@ -131,7 +140,10 @@ func _physics_process(delta: float) -> void:
 	else:
 		velocity = Vector2.ZERO
 	move_and_slide()
-	_apply_active_attack_hits()
+	if state == State.ATTACK and _uses_body_motion_hit_detection():
+		_apply_body_motion_attack_hits(previous_position)
+	else:
+		_apply_active_attack_hits()
 
 
 func _process(_delta: float) -> void:
@@ -165,9 +177,16 @@ func activate(spawn_position: Vector2, new_stats: Resource = null) -> void:
 	attack_slot_position = spawn_position
 	has_attack_slot = false
 	attack_slot_elapsed = 0.0
+	attack_slot_stuck_elapsed = 0.0
+	attack_slot_last_distance = INF
 	attack_slot_excluded_directions.clear()
 	attack_elapsed = 0.0
 	current_attack_action = ""
+	current_attack_type = "melee"
+	current_attack_profile = {}
+	leap_start_position = spawn_position
+	leap_end_position = spawn_position
+	leap_duration = 0.0
 	attack_cooldown_remaining = 0.0
 	path_refresh_remaining = 0.0
 	navigation_destination = Vector2.INF
@@ -180,6 +199,7 @@ func activate(spawn_position: Vector2, new_stats: Resource = null) -> void:
 	if animation_player != null:
 		animation_player.stop()
 	sprite.modulate = Color.WHITE
+	sprite.position = Vector2.ZERO
 	_set_attack_active(false)
 	set_physics_process(true)
 	_play_idle()
@@ -198,9 +218,16 @@ func deactivate() -> void:
 	navigation_destination = Vector2.INF
 	has_attack_slot = false
 	attack_slot_elapsed = 0.0
+	attack_slot_stuck_elapsed = 0.0
+	attack_slot_last_distance = INF
 	attack_slot_excluded_directions.clear()
 	attack_elapsed = 0.0
 	current_attack_action = ""
+	current_attack_type = "melee"
+	current_attack_profile = {}
+	leap_start_position = global_position
+	leap_end_position = global_position
+	leap_duration = 0.0
 	_hit_targets.clear()
 	remove_from_group("enemy")
 	set_physics_process(false)
@@ -211,6 +238,7 @@ func deactivate() -> void:
 	if animation_player != null:
 		animation_player.stop()
 	sprite.stop()
+	sprite.position = Vector2.ZERO
 	_set_attack_active(false)
 	hide()
 
@@ -256,27 +284,39 @@ func die() -> void:
 	died.emit(self)
 
 
-func can_attack() -> bool:
+func can_attack(action_name := "") -> bool:
 	if target == null or attack_cooldown_remaining > 0.0:
 		return false
-	return _is_target_in_attack_range(target) and _is_target_in_attack_area(target)
+	if action_name == "":
+		for action in get_attack_actions():
+			if _can_use_attack_action(action):
+				return true
+		return false
+	return _can_use_attack_action(action_name)
 
 
 func is_alive() -> bool:
 	return state != State.DEAD
 
 
-func begin_attack(animation_name := "first_attack") -> void:
-	if state == State.DEAD or not can_attack():
+func begin_attack(animation_name := "attack_first") -> void:
+	if state == State.DEAD:
+		return
+
+	animation_name = _directional_animation_name(animation_name)
+	current_attack_action = _attack_action_from_animation(animation_name)
+	if not _can_use_attack_action(current_attack_action):
+		current_attack_action = ""
 		return
 
 	state = State.ATTACK
 	attack_cooldown_remaining = get_attack_cooldown()
 	attack_elapsed = 0.0
 	_hit_targets.clear()
+	current_attack_profile = get_attack_profile(current_attack_action)
+	current_attack_type = String(current_attack_profile.get("type", "melee"))
+	_prepare_attack_motion()
 	_sync_attack_area_to_direction()
-	animation_name = _directional_animation_name(animation_name)
-	current_attack_action = _attack_action_from_animation(animation_name)
 	if animation_player != null and animation_player.has_animation(animation_name):
 		animation_player.play(animation_name)
 	elif sprite.sprite_frames != null and sprite.sprite_frames.has_animation(animation_name):
@@ -291,7 +331,7 @@ func _on_animation_player_finished(animation_name: StringName) -> void:
 
 
 func _on_sprite_frame_changed() -> void:
-	if state != State.ATTACK:
+	if state != State.ATTACK or _uses_body_motion_hit_detection():
 		return
 
 	var action_name := _attack_action_from_animation(sprite.animation)
@@ -312,19 +352,29 @@ func _on_sprite_animation_finished() -> void:
 func _finish_attack() -> void:
 	_set_attack_active(false)
 	_hit_targets.clear()
+	var recovery := float(current_attack_profile.get("recovery", 0.0))
+	if recovery > 0.0:
+		attack_cooldown_remaining = maxf(attack_cooldown_remaining, recovery)
 	attack_elapsed = 0.0
 	current_attack_action = ""
+	current_attack_type = "melee"
+	current_attack_profile = {}
+	leap_duration = 0.0
 	if state == State.DEAD:
 		return
 
 	if target == null:
 		state = State.IDLE
 		velocity = Vector2.ZERO
+		sprite.position = Vector2.ZERO
 		_play_idle()
 		return
 
 	state = State.CHASE
 	velocity = Vector2.ZERO
+	if target != null:
+		current_direction = _direction_from_vector(target.global_position - global_position)
+	sprite.position = Vector2.ZERO
 	_play_idle()
 
 
@@ -336,26 +386,29 @@ func _clear_target() -> void:
 	path_refresh_remaining = 0.0
 	navigation_destination = Vector2.INF
 	current_attack_action = ""
+	current_attack_type = "melee"
+	current_attack_profile = {}
+	leap_duration = 0.0
 	attack_elapsed = 0.0
 	_hit_targets.clear()
 	_set_attack_active(false)
 	if animation_player != null:
 		animation_player.stop()
 	if state != State.DEAD:
+		sprite.position = Vector2.ZERO
 		_start_idle()
 
 
 func _is_attack_animation(animation_name: StringName) -> bool:
 	var name := String(animation_name)
-	return name.begins_with("first_attack_") or name.begins_with("second_attack_")
+	return name.begins_with("attack_")
 
 
 func _attack_action_from_animation(animation_name: StringName) -> String:
 	var name := String(animation_name)
-	if name.begins_with("first_attack_"):
-		return "first_attack"
-	if name.begins_with("second_attack_"):
-		return "second_attack"
+	var parts := name.split("_", false)
+	if parts.size() >= 3 and parts[0] == "attack":
+		return "attack_%s" % parts[parts.size() - 1]
 	return name
 
 
@@ -376,6 +429,24 @@ func _is_attack_animation_playing() -> bool:
 	if sprite.is_playing():
 		return _is_attack_animation(sprite.animation)
 	return false
+
+
+func _select_attack_action() -> String:
+	var available_actions: Array[String] = []
+	for action in get_attack_actions():
+		var animation_name := _directional_animation_name(action)
+		if _has_animation(animation_name) and _can_use_attack_action(action):
+			available_actions.append(action)
+
+	if available_actions.is_empty():
+		return "attack_first"
+	return available_actions.pick_random()
+
+
+func _has_animation(animation_name: String) -> bool:
+	if animation_player != null and animation_player.has_animation(animation_name):
+		return true
+	return sprite.sprite_frames != null and sprite.sprite_frames.has_animation(animation_name)
 
 
 func get_max_health() -> int:
@@ -400,6 +471,27 @@ func get_defense() -> int:
 
 func get_attack_power() -> int:
 	return stats.attack_power if stats != null else 8
+
+
+func get_attack_actions() -> Array[String]:
+	if stats != null:
+		var configured_actions: Variant = stats.get("attack_actions")
+		if configured_actions is Array and not configured_actions.is_empty():
+			var actions: Array[String] = []
+			for action in configured_actions:
+				actions.append(String(action))
+			return actions
+	return ["attack_first"]
+
+
+func get_attack_profile(action_name: String) -> Dictionary:
+	if stats != null:
+		var profiles: Variant = stats.get("attack_profiles")
+		if profiles is Dictionary and profiles.has(action_name):
+			var profile: Variant = profiles[action_name]
+			if profile is Dictionary:
+				return profile
+	return {"type": "melee"}
 
 
 func get_detect_range() -> float:
@@ -440,14 +532,25 @@ func _update_combat_movement(_delta: float) -> void:
 		_play_idle()
 		return
 
+	var special_attack := _select_available_special_attack()
+	if special_attack != "":
+		_release_attack_slot()
+		attack_slot_excluded_directions.clear()
+		current_direction = _direction_from_vector(to_target)
+		_sync_attack_area_to_direction()
+		velocity = Vector2.ZERO
+		begin_attack(special_attack)
+		return
+
 	if _should_use_attack_slot(to_target):
 		_update_attack_slot(to_target, _delta)
 		current_direction = attack_slot_direction
 		_sync_attack_area_to_direction()
 
-		if has_attack_slot and can_attack():
+		var melee_attack := _select_available_melee_attack()
+		if has_attack_slot and melee_attack != "":
 			velocity = Vector2.ZERO
-			begin_attack()
+			begin_attack(melee_attack)
 			return
 
 		var to_slot := attack_slot_position - global_position
@@ -502,9 +605,12 @@ func _update_attack_slot(to_target: Vector2, delta: float) -> void:
 		has_attack_slot = claimed_direction != ""
 		attack_slot_direction = claimed_direction if has_attack_slot else preferred_direction
 		attack_slot_elapsed = 0.0
+		attack_slot_stuck_elapsed = 0.0
+		attack_slot_last_distance = INF
 	attack_slot_position = _get_attack_slot_position(attack_slot_direction)
 	if has_attack_slot:
 		attack_slot_elapsed += delta
+		_update_attack_slot_progress(global_position.distance_to(attack_slot_position), delta)
 		if not _is_attack_slot_reachable(attack_slot_position):
 			_exclude_current_attack_slot()
 
@@ -522,6 +628,8 @@ func _release_attack_slot() -> void:
 		_attack_slot_manager.release_slot(self)
 	has_attack_slot = false
 	attack_slot_elapsed = 0.0
+	attack_slot_stuck_elapsed = 0.0
+	attack_slot_last_distance = INF
 
 
 func _exclude_current_attack_slot() -> void:
@@ -535,7 +643,20 @@ func _exclude_current_attack_slot() -> void:
 func _should_give_up_attack_slot(to_slot: Vector2) -> bool:
 	if not has_attack_slot:
 		return false
-	return attack_slot_elapsed >= attack_slot_timeout and to_slot.length() > attack_slot_arrive_distance
+	return attack_slot_stuck_elapsed >= attack_slot_timeout and to_slot.length() > attack_slot_arrive_distance
+
+
+func _update_attack_slot_progress(distance_to_slot: float, delta: float) -> void:
+	if attack_slot_last_distance == INF:
+		attack_slot_last_distance = distance_to_slot
+		attack_slot_stuck_elapsed = 0.0
+		return
+
+	if distance_to_slot < attack_slot_last_distance - attack_slot_progress_epsilon:
+		attack_slot_stuck_elapsed = 0.0
+	else:
+		attack_slot_stuck_elapsed += delta
+	attack_slot_last_distance = distance_to_slot
 
 
 func _is_attack_slot_reachable(slot_position: Vector2) -> bool:
@@ -724,6 +845,130 @@ func _set_attack_active(active: bool) -> void:
 	attack_shape.disabled = not active
 
 
+func _can_use_attack_action(action_name: String) -> bool:
+	if target == null or attack_cooldown_remaining > 0.0:
+		return false
+
+	var profile := get_attack_profile(action_name)
+	var attack_type := String(profile.get("type", "melee"))
+	var distance := global_position.distance_to(target.global_position)
+	if attack_type == "leap" or attack_type == "cross":
+		var min_range := float(profile.get("min_range", 0.0))
+		var max_range := float(profile.get("max_range", get_detect_range()))
+		return distance >= min_range and distance <= max_range
+	if _is_ready_for_melee_attack_slot():
+		return true
+	return _is_target_in_attack_range(target) and _is_target_in_attack_area(target)
+
+
+func _select_available_special_attack() -> String:
+	var available_actions: Array[String] = []
+	for action in get_attack_actions():
+		if String(get_attack_profile(action).get("type", "melee")) == "melee":
+			continue
+		var animation_name := _directional_animation_name(action)
+		if _has_animation(animation_name) and _can_use_attack_action(action):
+			available_actions.append(action)
+	if available_actions.is_empty():
+		return ""
+	return available_actions.pick_random()
+
+
+func _select_available_melee_attack() -> String:
+	var available_actions: Array[String] = []
+	for action in get_attack_actions():
+		if String(get_attack_profile(action).get("type", "melee")) != "melee":
+			continue
+		var animation_name := _directional_animation_name(action)
+		if _has_animation(animation_name) and _can_use_attack_action(action):
+			available_actions.append(action)
+	if available_actions.is_empty():
+		return ""
+	return available_actions.pick_random()
+
+
+func _is_ready_for_melee_attack_slot() -> bool:
+	if target == null or not has_attack_slot:
+		return false
+	if state != State.APPROACH_ATTACK_SLOT:
+		return false
+	if global_position.distance_to(attack_slot_position) > attack_slot_arrive_distance:
+		return false
+	return global_position.distance_to(target.global_position) <= get_attack_range() + attack_slot_arrive_distance
+
+
+func _prepare_attack_motion() -> void:
+	leap_start_position = global_position
+	leap_end_position = global_position
+	leap_duration = 0.0
+	if not current_attack_type in ["leap", "cross"] or target == null:
+		return
+
+	var to_target := target.global_position - global_position
+	if to_target == Vector2.ZERO:
+		return
+
+	var direction := to_target.normalized()
+	current_direction = _direction_from_vector(direction)
+	if current_attack_type == "cross":
+		var cross_distance := float(current_attack_profile.get("cross_distance", get_attack_range()))
+		leap_duration = maxf(float(current_attack_profile.get("cross_duration", 0.45)), 0.05)
+		leap_end_position = target.global_position + direction * cross_distance
+		return
+
+	var leap_distance := float(current_attack_profile.get("leap_distance", minf(to_target.length(), 36.0)))
+	var max_distance := maxf(to_target.length() - get_attack_range() * 0.5, 0.0)
+	leap_distance = minf(leap_distance, max_distance)
+	leap_duration = maxf(float(current_attack_profile.get("leap_duration", 0.35)), 0.05)
+	leap_end_position = global_position + direction * leap_distance
+
+
+func _update_attack_motion(_delta: float) -> void:
+	if not current_attack_type in ["leap", "cross"] or leap_duration <= 0.0:
+		velocity = Vector2.ZERO
+		return
+
+	if attack_elapsed >= leap_duration:
+		velocity = Vector2.ZERO
+		return
+
+	var remaining_time := maxf(leap_duration - attack_elapsed, 0.001)
+	var to_destination := leap_end_position - global_position
+	velocity = to_destination / remaining_time
+
+
+func _uses_body_motion_hit_detection() -> bool:
+	return String(current_attack_profile.get("hit_detection", "")) == "body_motion"
+
+
+func _apply_body_motion_attack_hits(previous_position: Vector2) -> void:
+	if target == null or not _is_attack_motion_active():
+		return
+	if _is_target_in_body_motion_area(target, previous_position):
+		_try_hit_target(target)
+
+
+func _is_attack_motion_active() -> bool:
+	if not current_attack_type in ["leap", "cross"]:
+		return false
+	if leap_duration <= 0.0:
+		return false
+	return attack_elapsed <= leap_duration
+
+
+func _is_target_in_body_motion_area(target_node: Node2D, previous_position: Vector2) -> bool:
+	if target_node == null:
+		return false
+
+	var body_rect := _get_swept_body_collision_rect(previous_position)
+	var target_rect := _get_target_hitbox_global_rect(target_node)
+	if body_rect.size == Vector2.ZERO:
+		return false
+	if target_rect.size == Vector2.ZERO:
+		return body_rect.has_point(target_node.global_position)
+	return body_rect.intersects(target_rect, true)
+
+
 func _is_target_in_attack_range(target_node: Node2D) -> bool:
 	return global_position.distance_to(target_node.global_position) <= get_attack_range()
 
@@ -767,7 +1012,7 @@ func _sync_attack_area_to_direction() -> void:
 
 func _get_attack_area_position_for_direction(direction: String) -> Vector2:
 	var animation_names := [
-		"first_attack_%s" % direction,
+		"attack_%s_first" % direction,
 		"idle_%s" % direction,
 		"walk_%s" % direction,
 	]
@@ -792,6 +1037,27 @@ func _get_attack_area_position_from_animation(animation_name: String) -> Variant
 	return null
 
 
+func _direction_from_animation_name(animation_name: String) -> String:
+	var parts := animation_name.split("_", false)
+	if parts.size() >= 4 and parts[1] == "side" and parts[2] == "left":
+		return "side_left"
+	if parts.size() >= 2 and parts[1] == "side":
+		return "side"
+	if parts.size() >= 2 and parts[1] == "down":
+		return "down"
+	if parts.size() >= 2 and parts[1] == "up":
+		return "up"
+	if animation_name.ends_with("_side_left"):
+		return "side_left"
+	if animation_name.ends_with("_side"):
+		return "side"
+	if animation_name.ends_with("_down"):
+		return "down"
+	if animation_name.ends_with("_up"):
+		return "up"
+	return current_direction
+
+
 func _get_target_hitbox_global_rect(target_node: Node2D) -> Rect2:
 	var hitbox_shape := target_node.get_node_or_null("HitboxArea2D/CollisionShape2D") as CollisionShape2D
 	if hitbox_shape == null:
@@ -814,6 +1080,16 @@ func _get_collision_shape_global_rect(collision_shape: CollisionShape2D) -> Rect
 	if half_size == Vector2.ZERO:
 		return Rect2()
 	return Rect2(collision_shape.global_position - half_size, half_size * 2.0)
+
+
+func _get_swept_body_collision_rect(previous_position: Vector2) -> Rect2:
+	var current_rect := _get_collision_shape_global_rect(body_collision_shape)
+	if current_rect.size == Vector2.ZERO:
+		return Rect2()
+
+	var previous_rect := current_rect
+	previous_rect.position += previous_position - global_position
+	return current_rect.merge(previous_rect)
 
 
 func _get_collision_shape_half_size(collision_shape: CollisionShape2D) -> Vector2:
@@ -847,6 +1123,11 @@ func _disable_combat_logic() -> void:
 	velocity = Vector2.ZERO
 	target = null
 	_hit_targets.clear()
+	current_attack_type = "melee"
+	current_attack_profile = {}
+	leap_start_position = global_position
+	leap_end_position = global_position
+	leap_duration = 0.0
 	remove_from_group("enemy")
 	set_physics_process(false)
 	collision_layer = 0
@@ -855,6 +1136,7 @@ func _disable_combat_logic() -> void:
 	hitbox_area.monitorable = false
 	if animation_player != null:
 		animation_player.stop()
+	sprite.position = Vector2.ZERO
 	_set_attack_active(false)
 
 
@@ -878,10 +1160,32 @@ func _try_hit_target(candidate: Node) -> void:
 	if hit_target == null or hit_target in _hit_targets:
 		return
 
+	var attack_profile := _get_active_attack_profile()
 	_hit_targets.append(hit_target)
 	if hit_target.has_method("take_damage"):
 		hit_target.take_damage(get_attack_power())
+	_apply_attack_status_effect(hit_target, attack_profile)
 	attack_hit.emit(hit_target)
+
+
+func _get_active_attack_profile() -> Dictionary:
+	if not current_attack_profile.is_empty():
+		return current_attack_profile
+	if current_attack_action != "":
+		return get_attack_profile(current_attack_action)
+	return {}
+
+
+func _apply_attack_status_effect(hit_target: Node, attack_profile: Dictionary) -> void:
+	var status_effect := String(attack_profile.get("status_effect", ""))
+	if status_effect == "" or not hit_target.has_method("apply_status_effect"):
+		return
+
+	var duration := float(attack_profile.get("status_duration", 0.0))
+	if duration <= 0.0:
+		return
+
+	hit_target.apply_status_effect(status_effect, duration, self)
 
 
 func _resolve_hit_target(candidate: Node) -> Node:
@@ -894,6 +1198,7 @@ func _resolve_hit_target(candidate: Node) -> Node:
 
 
 func _play_idle() -> void:
+	sprite.position = Vector2.ZERO
 	var animation_name := "idle_%s" % current_direction
 	if sprite.sprite_frames != null and sprite.sprite_frames.has_animation(animation_name):
 		if sprite.animation != StringName(animation_name) or not sprite.is_playing():
@@ -901,6 +1206,7 @@ func _play_idle() -> void:
 
 
 func _play_walk(direction: Vector2) -> void:
+	sprite.position = Vector2.ZERO
 	var animation_name := "walk_side"
 	if absf(direction.x) >= absf(direction.y):
 		animation_name = "walk_side_left" if direction.x < 0.0 else "walk_side"
@@ -924,15 +1230,31 @@ func _direction_from_vector(direction: Vector2) -> String:
 
 
 func _directional_animation_name(animation_name: String) -> String:
+	if _is_directional_animation_name(animation_name):
+		return animation_name
 	if animation_name.ends_with("_up") or animation_name.ends_with("_down") or animation_name.ends_with("_side") or animation_name.ends_with("_side_left"):
 		return animation_name
+	var parts := animation_name.split("_", false, 1)
+	if parts.size() == 2 and (parts[0] in ["attack", "death"]):
+		return "%s_%s_%s" % [parts[0], current_direction, parts[1]]
 	return "%s_%s" % [animation_name, current_direction]
+
+
+func _is_directional_animation_name(animation_name: String) -> bool:
+	var parts := animation_name.split("_", false)
+	if parts.size() >= 3 and (parts[0] in ["attack", "death"]):
+		return _direction_from_animation_name(animation_name) in ATTACK_SLOT_DIRECTIONS
+	return false
 
 
 func _play_death() -> void:
 	var animation_names := _get_death_animation_candidates()
 	if not animation_names.is_empty():
-		sprite.play(animation_names.pick_random())
+		var animation_name: StringName = animation_names.pick_random()
+		if animation_player != null and animation_player.has_animation(animation_name):
+			animation_player.play(animation_name)
+		else:
+			sprite.play(animation_name)
 		return
 
 	hide()
@@ -952,10 +1274,9 @@ func _get_death_animation_candidates() -> Array[StringName]:
 
 
 func _append_death_animations_for_direction(candidates: Array[StringName], direction: String) -> void:
-	var suffix := "_%s" % direction
 	for animation_name in sprite.sprite_frames.get_animation_names():
 		var name := String(animation_name)
-		if name.contains("_death_") and name.ends_with(suffix):
+		if name.begins_with("death_") and _direction_from_animation_name(name) == direction:
 			candidates.append(animation_name)
 
 

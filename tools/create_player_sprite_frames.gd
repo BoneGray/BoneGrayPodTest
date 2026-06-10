@@ -3,52 +3,62 @@ extends SceneTree
 
 const SOURCE_DIR := "res://assets/characters/player/main"
 const OUTPUT_PATH := "res://resources/characters/player/player_sprite_frames.tres"
+const NO_HANDS_OUTPUT_PATH := "res://resources/characters/player/player_no_hands_sprite_frames.tres"
+const HANDS_OUTPUT_PATH := "res://resources/characters/player/player_hands_sprite_frames.tres"
 
 const ANIMATION_SPEEDS := {
 	"idle": 6.0,
 	"walk": 10.0,
-	"first_attack": 12.0,
-	"second_attack": 12.0,
+	"attack_first": 12.0,
+	"attack_second": 12.0,
 	"pickup": 8.0,
-	"first_death": 8.0,
-	"second_death": 8.0,
-	"third_death": 8.0,
+	"death_first": 8.0,
+	"death_second": 8.0,
+	"death_third": 8.0,
 }
 
 const FRAME_COUNT_OVERRIDES := {
-	"Character_side_death2-Sheet6.png": 7,
-	"Character_side_death3-Sheet6.png": 7,
+	"player_body_death_side_second_sheet6.png": 7,
+	"player_body_death_side_third_sheet6.png": 7,
+	"player_body_no_hands_death_side_second_sheet6.png": 7,
+	"player_body_no_hands_death_side_third_sheet6.png": 7,
 }
 
 
 func _initialize() -> void:
+	_create_sprite_frames(OUTPUT_PATH, "full_body")
+	_create_sprite_frames(NO_HANDS_OUTPUT_PATH, "no_hands_body")
+	_create_sprite_frames(HANDS_OUTPUT_PATH, "hands")
+	quit()
+
+
+func _create_sprite_frames(output_path: String, sheet_kind: String) -> void:
 	var frames := SpriteFrames.new()
 	frames.remove_animation("default")
 
-	var files := _collect_character_png_files(SOURCE_DIR)
+	var files := _collect_png_files(SOURCE_DIR, sheet_kind)
 	files.sort()
 	for file_path in files:
 		_add_sheet(frames, file_path)
 
-	var output_dir := ProjectSettings.globalize_path(OUTPUT_PATH.get_base_dir())
+	var output_dir := ProjectSettings.globalize_path(output_path.get_base_dir())
 	if not DirAccess.dir_exists_absolute(output_dir):
 		DirAccess.make_dir_recursive_absolute(output_dir)
 
-	var error := ResourceSaver.save(frames, OUTPUT_PATH)
+	var error := ResourceSaver.save(frames, output_path)
 	if error != OK:
-		push_error("Failed to save Player SpriteFrames: %s" % error)
+		push_error("Failed to save Player SpriteFrames %s: %s" % [output_path, error])
 	else:
-		print("Saved %s with %d animations." % [OUTPUT_PATH, frames.get_animation_names().size()])
-	quit()
+		print("Saved %s with %d animations." % [output_path, frames.get_animation_names().size()])
 
 
-func _collect_character_png_files(path: String) -> PackedStringArray:
+func _collect_png_files(path: String, sheet_kind: String) -> PackedStringArray:
 	var result := PackedStringArray()
-	_collect_recursive(path, result)
+	_collect_recursive(path, result, sheet_kind)
 	return result
 
 
-func _collect_recursive(path: String, result: PackedStringArray) -> void:
+func _collect_recursive(path: String, result: PackedStringArray, sheet_kind: String) -> void:
 	var dir := DirAccess.open(path)
 	if dir == null:
 		push_error("Could not open source dir: %s" % path)
@@ -60,19 +70,25 @@ func _collect_recursive(path: String, result: PackedStringArray) -> void:
 		var child_path := path.path_join(file_name)
 		if dir.current_is_dir():
 			if file_name != "Gif":
-				_collect_recursive(child_path, result)
-		elif _is_body_sheet(file_name):
+				_collect_recursive(child_path, result, sheet_kind)
+		elif _is_sheet_kind(file_name, sheet_kind):
 			result.append(child_path)
 		file_name = dir.get_next()
 	dir.list_dir_end()
 
 
-func _is_body_sheet(file_name: String) -> bool:
+func _is_sheet_kind(file_name: String, sheet_kind: String) -> bool:
 	var lower_name := file_name.to_lower()
-	return lower_name.get_extension() == "png" \
-		and lower_name.begins_with("character_") \
-		and not lower_name.contains("nohands") \
-		and not lower_name.contains("no-hands")
+	if lower_name.get_extension() != "png":
+		return false
+
+	if sheet_kind == "full_body":
+		return lower_name.begins_with("player_body_") and not lower_name.begins_with("player_body_no_hands_")
+	if sheet_kind == "no_hands_body":
+		return lower_name.begins_with("player_body_no_hands_")
+	if sheet_kind == "hands":
+		return lower_name.begins_with("player_hands_")
+	return false
 
 
 func _add_sheet(frames: SpriteFrames, file_path: String) -> void:
@@ -115,73 +131,64 @@ func _resolve_frame_count(path: String, texture_width: int) -> int:
 		return 0
 
 	if texture_width % frame_count != 0:
-		push_warning("%s width %d is not divisible by Sheet%d. Add a FRAME_COUNT_OVERRIDES entry if this animation slices wrong." % [file_name, texture_width, frame_count])
+		push_warning("%s width %d is not divisible by sheet%d. Add a FRAME_COUNT_OVERRIDES entry if this animation slices wrong." % [file_name, texture_width, frame_count])
 	return frame_count
 
 
 func _extract_frame_count(path: String) -> int:
 	var regex := RegEx.new()
-	regex.compile("Sheet(\\d+)")
-	var match := regex.search(path.get_file())
+	regex.compile("sheet(\\d+)")
+	var match := regex.search(path.get_file().to_lower())
 	if match == null:
 		return 0
 	return int(match.get_string(1))
 
 
 func _animation_names_from_path(path: String) -> PackedStringArray:
-	var base_name := path.get_file().get_basename()
+	var base_name := path.get_file().get_basename().to_lower()
 	var regex := RegEx.new()
-	regex.compile("-Sheet\\d+$")
+	regex.compile("_sheet\\d+$")
 	base_name = regex.sub(base_name, "", true)
-	base_name = base_name.trim_prefix("Character_")
+	base_name = base_name.trim_prefix("player_body_no_hands_")
+	base_name = base_name.trim_prefix("player_body_")
+	base_name = base_name.trim_prefix("player_hands_")
 
-	var parts := base_name.split("_", false)
+	return _animation_names_from_parts(base_name.split("_", false))
+
+
+func _animation_names_from_parts(parts: PackedStringArray) -> PackedStringArray:
 	if parts.size() < 2:
-		return PackedStringArray([base_name.to_snake_case()])
+		return PackedStringArray(["_".join(parts)])
 
-	var direction := _normalize_direction(parts[0])
-	var source_action := "_".join(parts.slice(1)).to_lower()
-	var action_names := _normalize_actions(source_action)
-	var animation_names := PackedStringArray()
-	for action_name in action_names:
-		animation_names.append("%s_%s" % [action_name, direction])
-	return animation_names
+	var action := parts[0]
+	var direction := parts[1]
+	var supplement_start := 2
+	if parts.size() >= 3 and parts[1] == "side" and parts[2] == "left":
+		direction = "side_left"
+		supplement_start = 3
 
+	var supplement := ""
+	if supplement_start < parts.size():
+		supplement = "_".join(parts.slice(supplement_start))
 
-func _normalize_direction(direction: String) -> String:
-	match direction.to_lower():
-		"side-left":
-			return "side_left"
-		"side":
-			return "side"
-		"down":
-			return "down"
-		"up":
-			return "up"
-		_:
-			return direction.to_snake_case()
-
-
-func _normalize_actions(source_action: String) -> PackedStringArray:
-	if source_action == "idle":
-		return PackedStringArray(["idle"])
-	if source_action == "run":
-		return PackedStringArray(["walk"])
-	if source_action == "punch":
-		return PackedStringArray(["first_attack", "second_attack"])
-	if source_action == "pick-up":
-		return PackedStringArray(["pickup"])
-	if source_action == "death1":
-		return PackedStringArray(["first_death"])
-	if source_action == "death2":
-		return PackedStringArray(["second_death"])
-	if source_action == "death3":
-		return PackedStringArray(["third_death"])
-	return PackedStringArray([source_action.to_snake_case()])
+	if action == "attack" and supplement == "":
+		return PackedStringArray(["attack_%s_first" % direction, "attack_%s_second" % direction])
+	if action == "death" and supplement == "":
+		supplement = "first"
+	if supplement != "":
+		return PackedStringArray(["%s_%s_%s" % [action, direction, supplement]])
+	return PackedStringArray(["%s_%s" % [action, direction]])
 
 
 func _action_from_animation_name(animation_name: String) -> String:
-	for action in ANIMATION_SPEEDS.keys():
-		if animation_name.begins_with("%s_" % action):
-			return action
-	return animation_name.get_slice("_", 0)
+	var parts := animation_name.split("_", false)
+	if parts.size() >= 3 and (parts[0] in ["attack", "death"]):
+		return "%s_%s" % [parts[0], parts[parts.size() - 1]]
+	return parts[0] if not parts.is_empty() else animation_name
+
+
+func _animation_name(action: String, direction: String) -> String:
+	var parts := action.split("_", false, 1)
+	if parts.size() == 2 and (parts[0] in ["attack", "death"]):
+		return "%s_%s_%s" % [parts[0], direction, parts[1]]
+	return "%s_%s" % [action, direction]

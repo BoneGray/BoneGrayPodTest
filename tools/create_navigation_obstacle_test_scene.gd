@@ -3,7 +3,8 @@ extends SceneTree
 
 const SCENE_PATH := "res://scenes/navigation_obstacle_test_scene.tscn"
 const PLAYER_SCENE_PATH := "res://scenes/characters/player.tscn"
-const ENEMY_SCENE_PATH := "res://scenes/characters/enemy.tscn"
+const SMALL_ENEMY_SCENE_PATH := "res://scenes/characters/enemy_zombie_small.tscn"
+const BIG_ENEMY_SCENE_PATH := "res://scenes/characters/enemy.tscn"
 const CAMERA_SCRIPT_PATH := "res://scripts/camera_follow_target.gd"
 
 const WORLD_COLLISION_LAYER := 1
@@ -31,9 +32,10 @@ func _initialize() -> void:
 
 func _run() -> void:
 	var player_scene := load(PLAYER_SCENE_PATH) as PackedScene
-	var enemy_scene := load(ENEMY_SCENE_PATH) as PackedScene
+	var small_enemy_scene := load(SMALL_ENEMY_SCENE_PATH) as PackedScene
+	var big_enemy_scene := load(BIG_ENEMY_SCENE_PATH) as PackedScene
 	var camera_script := load(CAMERA_SCRIPT_PATH) as Script
-	if player_scene == null or enemy_scene == null or camera_script == null:
+	if player_scene == null or small_enemy_scene == null or big_enemy_scene == null or camera_script == null:
 		push_error("Could not load required scenes or scripts.")
 		quit(1)
 		return
@@ -65,18 +67,8 @@ func _run() -> void:
 	root.add_child(player)
 	player.owner = root
 
-	var enemy_positions := [
-		Vector2(220, 144),
-		Vector2(156, 88),
-		Vector2(104, 176),
-	]
-	for index in enemy_positions.size():
-		var enemy := enemy_scene.instantiate() as CharacterBody2D
-		enemy.name = "NavEnemy%d" % [index + 1]
-		enemy.position = enemy_positions[index]
-		enemy.set("use_navigation_agent", true)
-		root.add_child(enemy)
-		enemy.owner = root
+	_add_enemy(root, small_enemy_scene, "NavEnemy1", Vector2(77, 150))
+	_add_enemy(root, big_enemy_scene, "NavBig1", Vector2(176, 144))
 
 	var packed_scene := PackedScene.new()
 	var pack_result := packed_scene.pack(root)
@@ -152,6 +144,15 @@ func _add_obstacle(root: Node, base_name: String, rect: Rect2) -> void:
 	visual.color = OBSTACLE_COLOR
 	body.add_child(visual)
 	visual.owner = root
+
+
+func _add_enemy(root: Node, enemy_scene: PackedScene, enemy_name: String, position: Vector2) -> void:
+	var enemy := enemy_scene.instantiate() as CharacterBody2D
+	enemy.name = enemy_name
+	enemy.position = position
+	enemy.set("use_navigation_agent", true)
+	root.add_child(enemy)
+	enemy.owner = root
 
 
 func _rect_to_polygon(rect: Rect2) -> PackedVector2Array:

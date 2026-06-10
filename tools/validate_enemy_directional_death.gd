@@ -9,16 +9,16 @@ func _initialize() -> void:
 
 
 func _run() -> void:
-	if not await _validate_death_animation("side", "side", [&"first_death_side", &"second_death_side"]):
+	if not await _validate_death_animation("side", "side", [&"death_side_first", &"death_side_second"]):
 		quit(1)
 		return
-	if not await _validate_death_animation("side_left", "side_left", [&"first_death_side_left", &"second_death_side_left"]):
+	if not await _validate_death_animation("side_left", "side_left", [&"death_side_left_first", &"death_side_left_second"]):
 		quit(1)
 		return
-	if not await _validate_death_animation("up", "side_left", [&"first_death_side_left", &"second_death_side_left"]):
+	if not await _validate_death_animation("up", "side_left", [&"death_side_left_first", &"death_side_left_second"]):
 		quit(1)
 		return
-	if not await _validate_death_animation("down", "side", [&"first_death_side", &"second_death_side"]):
+	if not await _validate_death_animation("down", "side", [&"death_side_first", &"death_side_second"]):
 		quit(1)
 		return
 

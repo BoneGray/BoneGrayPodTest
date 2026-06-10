@@ -37,7 +37,7 @@ func _run() -> void:
 	var starting_health: int = player.call("get_current_health")
 	var saw_attack_window := false
 	var saw_attack_geometry_hit := false
-	for i in 90:
+	for i in 150:
 		await physics_frame
 		var attack_area := enemy.get_node("AttackArea2D") as Area2D
 		var attack_shape := enemy.get_node("AttackArea2D/CollisionShape2D") as CollisionShape2D

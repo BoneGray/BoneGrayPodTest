@@ -12,14 +12,14 @@ const REQUIRED_PLAYER_ANIMATIONS := [
 	"walk_side",
 	"walk_side_left",
 	"walk_up",
-	"first_attack_down",
-	"first_attack_side",
-	"first_attack_side_left",
-	"first_attack_up",
-	"second_attack_down",
-	"second_attack_side",
-	"second_attack_side_left",
-	"second_attack_up",
+	"attack_down_first",
+	"attack_side_first",
+	"attack_side_left_first",
+	"attack_up_first",
+	"attack_down_second",
+	"attack_side_second",
+	"attack_side_left_second",
+	"attack_up_second",
 ]
 
 const EXPECTED_PLAYER_HITBOX_SIZE := Vector2(8, 14)
@@ -27,14 +27,14 @@ const EXPECTED_PLAYER_HITBOX_POSITION := Vector2(0, 2)
 const EXPECTED_PLAYER_ATTACK_SIZE := Vector2(12, 10)
 const EXPECTED_PLAYER_ATTACK_POSITION := Vector2(10, 1)
 const EXPECTED_PLAYER_ATTACK_POSITIONS := {
-	"first_attack_side": Vector2(10, 1),
-	"first_attack_side_left": Vector2(-10, 1),
-	"first_attack_down": Vector2(0, 8),
-	"first_attack_up": Vector2(0, -7),
-	"second_attack_side": Vector2(10, 1),
-	"second_attack_side_left": Vector2(-10, 1),
-	"second_attack_down": Vector2(0, 8),
-	"second_attack_up": Vector2(0, -7),
+	"attack_side_first": Vector2(10, 1),
+	"attack_side_left_first": Vector2(-10, 1),
+	"attack_down_first": Vector2(0, 8),
+	"attack_up_first": Vector2(0, -7),
+	"attack_side_second": Vector2(10, 1),
+	"attack_side_left_second": Vector2(-10, 1),
+	"attack_down_second": Vector2(0, 8),
+	"attack_up_second": Vector2(0, -7),
 }
 const EXPECTED_PLAYER_BODY_SIZE := Vector2(8, 10)
 const EXPECTED_PLAYER_BODY_POSITION := Vector2(0, 3)

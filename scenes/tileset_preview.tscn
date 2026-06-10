@@ -1,7 +1,7 @@
-[gd_scene format=3 uid="uid://bh6ctbn2d3ljr"]
+[gd_scene format=3 uid="uid://c7vejiub0e1rg"]
 
 [ext_resource type="Script" uid="uid://cckdt3miacc65" path="res://scripts/tileset_preview.gd" id="1_preview"]
-[ext_resource type="Texture2D" uid="uid://bvf5hfupce8l4" path="res://assets/world/tiles/background/background_bleak_yellow_tileset.png" id="2_tiles"]
+[ext_resource type="Texture2D" uid="uid://wwemli2q3230" path="res://assets/world/tiles/background/tileset_terrain_background_bleak_yellow_tile16.png" id="2_tiles"]
 
 [node name="TilesetPreview" type="Node2D" unique_id=575429754]
 script = ExtResource("1_preview")

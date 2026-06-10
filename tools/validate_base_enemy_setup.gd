@@ -7,6 +7,16 @@ const WORLD_COLLISION_LAYER := 1
 const ENEMY_BODY_LAYER := 4
 const PLAYER_HITBOX_LAYER := 8
 const ENEMY_HITBOX_LAYER := 16
+const REQUIRED_ATTACK_ACTIONS := [
+	"attack_first",
+	"attack_second",
+]
+const REQUIRED_SECOND_ATTACK_ANIMATIONS := [
+	"attack_down_second",
+	"attack_side_second",
+	"attack_side_left_second",
+	"attack_up_second",
+]
 
 
 func _initialize() -> void:
@@ -103,6 +113,20 @@ func _validate_enemy_scene() -> bool:
 		push_error("Enemy detection ranges are invalid.")
 		enemy.queue_free()
 		return false
+
+	var attack_actions: Array = stats.get("attack_actions")
+	for action in REQUIRED_ATTACK_ACTIONS:
+		if not (action in attack_actions):
+			push_error("Enemy stats missing attack action: %s" % action)
+			enemy.queue_free()
+			return false
+
+	var animation_player := enemy.get_node("AnimationPlayer") as AnimationPlayer
+	for animation_name in REQUIRED_SECOND_ATTACK_ANIMATIONS:
+		if not animation_player.has_animation(animation_name):
+			push_error("Enemy AnimationPlayer missing animation: %s" % animation_name)
+			enemy.queue_free()
+			return false
 
 	enemy.queue_free()
 	return true

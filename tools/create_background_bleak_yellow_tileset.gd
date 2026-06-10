@@ -3,7 +3,7 @@ extends SceneTree
 const TILE_SIZE := Vector2i(16, 16)
 const ATLAS_COLUMNS := 24
 const ATLAS_ROWS := 17
-const TEXTURE_PATH := "res://assets/world/tiles/background/background_bleak_yellow_tileset.png"
+const TEXTURE_PATH := "res://assets/world/tiles/background/tileset_terrain_background_bleak_yellow_tile16.png"
 const TILESET_PATH := "res://resources/tiles/background_bleak_yellow_tileset.tres"
 
 func _initialize() -> void:

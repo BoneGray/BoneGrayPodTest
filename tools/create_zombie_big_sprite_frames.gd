@@ -7,10 +7,10 @@ const OUTPUT_PATH := "res://resources/characters/enemies/zombie_big_sprite_frame
 const ANIMATION_SPEEDS := {
 	"idle": 4.0,
 	"walk": 8.0,
-	"first_attack": 10.0,
-	"second_attack": 12.0,
-	"first_death": 8.0,
-	"second_death": 8.0,
+	"attack_first": 10.0,
+	"attack_second": 12.0,
+	"death_first": 8.0,
+	"death_second": 8.0,
 }
 
 
@@ -78,33 +78,51 @@ func _collect_png_files(path: String) -> PackedStringArray:
 
 func _extract_frame_count(path: String) -> int:
 	var regex := RegEx.new()
-	regex.compile("Sheet(\\d+)")
-	var match := regex.search(path.get_file())
+	regex.compile("sheet(\\d+)")
+	var match := regex.search(path.get_file().to_lower())
 	if match == null:
 		return 0
 	return int(match.get_string(1))
 
 
 func _animation_name_from_path(path: String) -> String:
-	var base_name := path.get_file().get_basename()
-	base_name = base_name.trim_prefix("Zombie_Big_")
+	var base_name := path.get_file().get_basename().to_lower()
 	var regex := RegEx.new()
-	regex.compile("-Sheet\\d+$")
+	regex.compile("_sheet\\d+$")
 	base_name = regex.sub(base_name, "", true)
-	var parts := base_name.split("_", false, 1)
-	if parts.size() != 2:
-		return base_name.to_snake_case()
+	base_name = base_name.trim_prefix("zombie_big_")
 
-	var direction := _normalize_direction(parts[0])
-	var action := _normalize_action(parts[1])
-	return "%s_%s" % [action, direction]
+	return _animation_name_from_parts(base_name.split("_", false))
 
 
 func _action_from_animation_name(animation_name: String) -> String:
-	for action in ANIMATION_SPEEDS.keys():
-		if animation_name.begins_with("%s_" % action):
-			return action
-	return animation_name.get_slice("_", 0)
+	var parts := animation_name.split("_", false)
+	if parts.size() >= 3 and (parts[0] in ["attack", "death"]):
+		return "%s_%s" % [parts[0], parts[parts.size() - 1]]
+	return parts[0] if not parts.is_empty() else animation_name
+
+
+func _animation_name(action: String, direction: String) -> String:
+	var parts := action.split("_", false, 1)
+	if parts.size() == 2 and (parts[0] in ["attack", "death"]):
+		return "%s_%s_%s" % [parts[0], direction, parts[1]]
+	return "%s_%s" % [action, direction]
+
+
+func _animation_name_from_parts(parts: PackedStringArray) -> String:
+	if parts.size() < 2:
+		return "_".join(parts)
+
+	var action := parts[0]
+	var direction := parts[1]
+	var supplement_start := 2
+	if parts.size() >= 3 and parts[1] == "side" and parts[2] == "left":
+		direction = "side_left"
+		supplement_start = 3
+
+	if supplement_start < parts.size():
+		return "%s_%s_%s" % [action, direction, "_".join(parts.slice(supplement_start))]
+	return "%s_%s" % [action, direction]
 
 
 func _normalize_direction(direction: String) -> String:
@@ -124,13 +142,13 @@ func _normalize_direction(direction: String) -> String:
 func _normalize_action(action: String) -> String:
 	match action:
 		"First-Attack":
-			return "first_attack"
+			return "attack_first"
 		"Second-Attack":
-			return "second_attack"
+			return "attack_second"
 		"First-Death":
-			return "first_death"
+			return "death_first"
 		"Second-Death":
-			return "second_death"
+			return "death_second"
 		"Idle":
 			return "idle"
 		"Walk":

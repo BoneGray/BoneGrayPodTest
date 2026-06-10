@@ -3,11 +3,11 @@ extends SceneTree
 const TEMPLATE_TILESET := "res://resources/tiles/background_bleak_yellow_tileset.tres"
 const VARIANTS := [
 	{
-		"texture": "res://assets/world/tiles/background/background_dark_green_tileset.png",
+		"texture": "res://assets/world/tiles/background/tileset_terrain_background_dark_green_tile16.png",
 		"tileset": "res://resources/tiles/background_dark_green_tileset.tres",
 	},
 	{
-		"texture": "res://assets/world/tiles/background/background_green_tileset.png",
+		"texture": "res://assets/world/tiles/background/tileset_terrain_background_green_tile16.png",
 		"tileset": "res://resources/tiles/background_green_tileset.tres",
 	},
 ]

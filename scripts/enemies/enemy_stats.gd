@@ -6,6 +6,8 @@ class_name EnemyStats
 @export var move_speed := 45.0
 @export var defense := 0
 @export var attack_power := 8
+@export var attack_actions: Array[String] = ["attack_first"]
+@export var attack_profiles := {}
 @export var detect_range := 96.0
 @export var lose_target_range := 144.0
 @export var attack_range := 18.0
