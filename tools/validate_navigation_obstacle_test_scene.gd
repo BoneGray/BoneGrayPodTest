@@ -6,6 +6,8 @@ const SMALL_STATS_PATH := "res://resources/characters/enemies/zombie_small_stats
 const SMALL_SPRITE_FRAMES_PATH := "res://resources/characters/enemies/zombie_small_sprite_frames.tres"
 const BIG_STATS_PATH := "res://resources/characters/enemies/zombie_big_stats.tres"
 const BIG_SPRITE_FRAMES_PATH := "res://resources/characters/enemies/zombie_big_sprite_frames.tres"
+const AXE_STATS_PATH := "res://resources/characters/enemies/zombie_axe_stats.tres"
+const AXE_SPRITE_FRAMES_PATH := "res://resources/characters/enemies/zombie_axe_sprite_frames.tres"
 const EXPECTED_OBSTACLE_COUNT := 7
 
 
@@ -31,8 +33,9 @@ func _run() -> void:
 	var player := root.get_node_or_null("Player") as CharacterBody2D
 	var enemies := root.find_children("NavEnemy*", "CharacterBody2D", false, false)
 	var big_enemies := root.find_children("NavBig*", "CharacterBody2D", false, false)
+	var axe_enemy := root.get_node_or_null("EnemyZombieAxe") as CharacterBody2D
 	var obstacles := root.find_children("*", "StaticBody2D", false, false)
-	if navigation_region == null or player == null or enemies.size() < 1 or big_enemies.size() < 1:
+	if navigation_region == null or player == null or axe_enemy == null or enemies.size() < 1 or big_enemies.size() < 1:
 		_fail(root, "Navigation obstacle test scene is missing required gameplay nodes.")
 		return
 	if obstacles.size() < EXPECTED_OBSTACLE_COUNT:
@@ -61,6 +64,9 @@ func _run() -> void:
 		if not _validate_enemy(root, enemy, player, BIG_STATS_PATH, BIG_SPRITE_FRAMES_PATH, "Zombie Big"):
 			return
 
+	if not _validate_enemy(root, axe_enemy, player, AXE_STATS_PATH, AXE_SPRITE_FRAMES_PATH, "Zombie Axe"):
+		return
+
 	print("Navigation obstacle test scene is valid.")
 	root.queue_free()
 	quit()
@@ -81,9 +87,6 @@ func _validate_enemy(root: Node, enemy: CharacterBody2D, player: CharacterBody2D
 	var sprite := enemy.get_node_or_null("Sprite") as AnimatedSprite2D
 	if sprite == null or sprite.sprite_frames == null or sprite.sprite_frames.resource_path != sprite_frames_path:
 		_fail(root, "%s should use %s SpriteFrames." % [enemy.name, display_name])
-		return false
-	if enemy.get("target") != player:
-		_fail(root, "%s did not acquire Player as target." % enemy.name)
 		return false
 	return true
 

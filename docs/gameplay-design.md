@@ -131,4 +131,7 @@ Current special attack decision:
 - Body-motion hit detection uses the enemy body collision shape swept from the previous physics frame to the current physics frame, so the hit range visually follows the body instead of `AttackArea2D`.
 - Cross attack should not continuously home toward the player after it starts. This keeps the attack readable and lets the player dodge.
 - After a cross attack, the enemy turns back toward the player so the final turn frames and gameplay direction agree.
-- Current prototype scope supports `melee`, `leap`, and `cross`; ranged, projectile, area, summon, or multi-phase attacks should be added as separate attack profile types later.
+- `Zombie Axe` uses `attack_second` as `type = "projectile"`: it throws its axe, loses the weapon after the projectile spawns, then switches to no-axe animations and no-axe melee.
+- A no-axe enemy should prefer retrieving its own landed weapon unless the player is already close enough to justify a no-axe melee response.
+- Enemy thrown weapons are enemy-owned in the current slice; the player cannot pick them up yet.
+- Current prototype scope supports `melee`, `leap`, `cross`, and simple enemy-owned `projectile`; area, summon, or multi-phase attacks should be added as separate attack profile types later.

@@ -1,7 +1,8 @@
 [gd_scene format=3 uid="uid://b60b21w0lwxke"]
 
 [ext_resource type="Script" uid="uid://dxhg5ioo3crwh" path="res://scripts/camera_follow_target.gd" id="1_408im"]
-[ext_resource type="PackedScene" path="res://scenes/characters/player.tscn" id="2_2usuc"]
+[ext_resource type="PackedScene" uid="uid://cid64ugn1d0ua" path="res://scenes/characters/player.tscn" id="2_2usuc"]
+[ext_resource type="PackedScene" path="res://scenes/characters/enemy_zombie_axe.tscn" id="3_p1xi7"]
 [ext_resource type="PackedScene" path="res://scenes/characters/enemy_zombie_small.tscn" id="5_vkqie"]
 [ext_resource type="PackedScene" path="res://scenes/characters/enemy.tscn" id="6_qtbig"]
 
@@ -127,10 +128,14 @@ target_path = NodePath("../Player")
 [node name="Player" parent="." unique_id=1160340334 instance=ExtResource("2_2usuc")]
 position = Vector2(110, 149)
 
-[node name="NavEnemy1" parent="." unique_id=1305528959 instance=ExtResource("5_vkqie")]
-position = Vector2(77, 150)
+[node name="EnemyZombieAxe" parent="." unique_id=1305528959 instance=ExtResource("3_p1xi7")]
+position = Vector2(96, 211)
 use_navigation_agent = true
 
-[node name="NavBig1" parent="." instance=ExtResource("6_qtbig")]
-position = Vector2(176, 144)
+[node name="NavEnemy1" parent="." unique_id=1197558562 instance=ExtResource("5_vkqie")]
+position = Vector2(318, 244)
+use_navigation_agent = true
+
+[node name="NavBig1" parent="." unique_id=1911799947 instance=ExtResource("6_qtbig")]
+position = Vector2(356, 244)
 use_navigation_agent = true

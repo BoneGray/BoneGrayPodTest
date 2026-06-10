@@ -1,0 +1,40 @@
+[gd_resource type="Resource" script_class="EnemyStats" format=3 uid="uid://bkaknn0ok3w2o"]
+
+[ext_resource type="Script" uid="uid://djibwqa6eumc2" path="res://scripts/enemies/enemy_stats.gd" id="1_enemy_stats"]
+
+[resource]
+script = ExtResource("1_enemy_stats")
+display_name = "Zombie Axe"
+max_health = 24
+move_speed = 48.0
+attack_power = 7
+attack_actions = Array[String](["attack_first", "attack_second", "attack_first_no_axe"])
+attack_profiles = {
+"attack_first": {
+"requires_weapon": true,
+"type": "melee"
+},
+"attack_first_no_axe": {
+"damage": 4,
+"requires_no_weapon": true,
+"type": "melee"
+},
+"attack_second": {
+"blocked_by_mask": 1,
+"damage": 10,
+"drop_weapon": true,
+"max_range": 126.0,
+"min_range": 36.0,
+"projectile_lifetime": 0.85,
+"projectile_scene": "res://scenes/projectiles/axe_projectile.tscn",
+"projectile_spawn_offset": 10.0,
+"projectile_spawn_time": 0.45,
+"projectile_speed": 145.0,
+"recovery": 0.35,
+"requires_weapon": true,
+"type": "projectile"
+}
+}
+lose_target_range = 128.0
+attack_cooldown = 1.1
+separation_radius = 15.0
