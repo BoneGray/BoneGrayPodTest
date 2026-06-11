@@ -1,0 +1,11 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/effects/bullet_casing.gd" id="1_casing_script"]
+[ext_resource type="Texture2D" path="res://assets/equipment/weapons/gun/gun_bullet_casing.png" id="2_casing_texture"]
+
+[node name="GunBulletCasing" type="Node2D"]
+z_index = 2
+script = ExtResource("1_casing_script")
+
+[node name="Sprite" type="Sprite2D" parent="."]
+texture = ExtResource("2_casing_texture")

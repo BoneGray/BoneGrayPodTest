@@ -1,5 +1,7 @@
 extends Node2D
 
+@export_group("Preview")
+## 需要预览的 TileSet 原始贴图。运行场景时会以 Sprite2D 方式放大显示。
 @export var tileset_texture: Texture2D
 
 func _ready() -> void:

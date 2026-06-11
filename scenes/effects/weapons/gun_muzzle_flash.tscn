@@ -1,0 +1,12 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/effects/muzzle_flash.gd" id="1_muzzle_flash"]
+[ext_resource type="SpriteFrames" path="res://resources/effects/weapons/gun/gun_muzzle_flash_sprite_frames.tres" id="2_muzzle_frames"]
+
+[node name="GunMuzzleFlash" type="Node2D"]
+z_index = 2
+script = ExtResource("1_muzzle_flash")
+
+[node name="Sprite" type="AnimatedSprite2D" parent="."]
+sprite_frames = ExtResource("2_muzzle_frames")
+animation = &"flash_side"

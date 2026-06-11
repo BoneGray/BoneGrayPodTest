@@ -4,7 +4,9 @@
 [ext_resource type="PackedScene" uid="uid://cid64ugn1d0ua" path="res://scenes/characters/player.tscn" id="2_2usuc"]
 [ext_resource type="PackedScene" path="res://scenes/characters/enemy_zombie_axe.tscn" id="3_p1xi7"]
 [ext_resource type="PackedScene" path="res://scenes/characters/enemy_zombie_small.tscn" id="5_vkqie"]
+[ext_resource type="PackedScene" path="res://scenes/items/weapons/baseball_bat_pickup.tscn" id="6_63h0e"]
 [ext_resource type="PackedScene" path="res://scenes/characters/enemy.tscn" id="6_qtbig"]
+[ext_resource type="PackedScene" path="res://scenes/items/weapons/gun_pickup.tscn" id="7_408im"]
 
 [sub_resource type="NavigationPolygon" id="NavigationPolygon_wwjcm"]
 vertices = PackedVector2Array(424, 56, 424, 304, 380, 220, 380, 164, 356, 148, 260, 164, 300, 148, 56, 304, 260, 220, 220, 212, 156, 212, 56, 56, 156, 84, 356, 60, 300, 60, 220, 84)
@@ -33,7 +35,6 @@ size = Vector2(96, 32)
 size = Vector2(32, 64)
 
 [node name="NavigationObstacleTestScene" type="Node2D" unique_id=825919720]
-y_sort_enabled = true
 
 [node name="Floor" type="Polygon2D" parent="." unique_id=22070971]
 color = Color(0.23, 0.23, 0.23, 1)
@@ -123,19 +124,28 @@ polygon = PackedVector2Array(-16, -32, 16, -32, 16, 32, -16, 32)
 zoom = Vector2(2.5, 2.5)
 position_smoothing_enabled = true
 script = ExtResource("1_408im")
-target_path = NodePath("../Player")
+target_path = NodePath("../WorldActors/Player")
 
-[node name="Player" parent="." unique_id=1160340334 instance=ExtResource("2_2usuc")]
+[node name="WorldActors" type="Node2D" parent="." unique_id=1884372589]
+y_sort_enabled = true
+
+[node name="Player" parent="WorldActors" unique_id=1160340334 instance=ExtResource("2_2usuc")]
 position = Vector2(110, 149)
 
-[node name="EnemyZombieAxe" parent="." unique_id=1305528959 instance=ExtResource("3_p1xi7")]
-position = Vector2(96, 211)
-use_navigation_agent = true
+[node name="EnemyZombieAxe" parent="WorldActors" unique_id=1305528959 instance=ExtResource("3_p1xi7")]
+position = Vector2(398, 282)
 
-[node name="NavEnemy1" parent="." unique_id=1197558562 instance=ExtResource("5_vkqie")]
+[node name="NavEnemy1" parent="WorldActors" unique_id=1197558562 instance=ExtResource("5_vkqie")]
 position = Vector2(318, 244)
 use_navigation_agent = true
 
-[node name="NavBig1" parent="." unique_id=1911799947 instance=ExtResource("6_qtbig")]
+[node name="NavBig1" parent="WorldActors" unique_id=1911799947 instance=ExtResource("6_qtbig")]
 position = Vector2(356, 244)
 use_navigation_agent = true
+
+[node name="BaseballBatPickup" parent="WorldActors" unique_id=224259991 instance=ExtResource("6_63h0e")]
+position = Vector2(259, 266)
+outline_color = Color(0.9812487, 0.89732003, 0.83248687, 1)
+
+[node name="GunPickup" parent="WorldActors" unique_id=1855383143 instance=ExtResource("7_408im")]
+position = Vector2(101, 197)

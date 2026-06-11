@@ -1,6 +1,9 @@
 extends Camera2D
 
+@export_group("Follow")
+## 相机跟随的目标节点路径，通常指向 Player 或测试场景里的可控制角色。
 @export var target_path: NodePath
+## 相机跟随的平滑强度。值越大越贴近目标，值越小拖尾感越明显。
 @export var follow_smoothing := 10.0
 
 var target: Node2D

@@ -22,31 +22,72 @@ const ATTACK_SLOT_DIRECTIONS := [
 	"up",
 ]
 
+@export_group("Stats")
+## 敌人属性资源，提供生命值、移动速度、攻击配置、发现范围和基础战斗数值。
 @export var stats: Resource
+
+@export_group("Targeting")
+## 敌人会搜索和攻击的目标组名，通常为 player。
 @export var target_group := "player"
+## 初始状态。测试场景中可用来让敌人从巡逻、待机或追击等状态开始。
 @export var start_state := State.IDLE
+## 是否自动搜索目标。关闭后需要外部脚本主动设置 target。
 @export var auto_acquire_target := true
+
+@export_group("Navigation")
+## 路径刷新间隔，单位为秒。值越小越灵敏，但更新更频繁。
 @export var path_refresh_interval := 0.25
+## 是否使用 NavigationAgent2D。当前原型默认关闭，使用直接移动和简单避障逻辑。
 @export var use_navigation_agent := false
+## 是否启用敌人之间的分离推力，避免多只敌人完全重叠。
 @export var use_separation := true
-@export var damage_log_enabled := true
+## 近距离直接追击范围，单位为像素。目标很近时减少路径抖动。
 @export var direct_chase_range := 48.0
+
+@export_group("Debug")
+## 是否在控制台输出受伤和生命值变化日志。
+@export var damage_log_enabled := true
+
+@export_group("Attack Slot")
+## 开始寻找攻击站位时，在基础攻击范围外额外允许的距离，单位为像素。
 @export var attack_slot_start_range_padding := 24.0
+## 离开攻击站位逻辑时，在基础攻击范围外额外允许的距离，单位为像素。
 @export var attack_slot_exit_range_padding := 36.0
+## 抵达攻击站位的判定距离，单位为像素。
 @export var attack_slot_arrive_distance := 6.0
+## 寻找攻击站位的超时时间，单位为秒。超时后会重新评估站位。
 @export var attack_slot_timeout := 1.0
+## 判断敌人是否有移动进展的最小距离，单位为像素。
 @export var attack_slot_progress_epsilon := 0.5
+## 判断攻击站位是否可达的容忍距离，单位为像素。
 @export var attack_slot_reachable_distance := 10.0
+
+@export_group("Idle Patrol")
+## 没有目标时是否在待机和巡逻之间随机切换。
 @export var idle_patrol_enabled := true
+## 待机最短时间，单位为秒。
 @export var idle_duration_min := 0.8
+## 待机最长时间，单位为秒。
 @export var idle_duration_max := 1.8
+## 巡逻最短时间，单位为秒。
 @export var patrol_duration_min := 1.4
+## 巡逻最长时间，单位为秒。
 @export var patrol_duration_max := 2.4
+## 巡逻速度倍率。相对于敌人正常移动速度。
 @export var patrol_speed_scale := 0.6
+
+@export_group("Weapon Retrieval")
+## 捡回自身武器的距离，单位为像素。
 @export var weapon_pickup_range := 8.0
+## 没有武器时，如果玩家进入该范围，敌人会优先近身攻击而不是继续捡武器。
 @export var no_weapon_close_attack_range := 24.0
+## 追取武器的超时时间，单位为秒。超时后会重新评估目标。
 @export var weapon_retrieval_timeout := 1.5
+## 判断追取武器是否有移动进展的最小距离，单位为像素。
 @export var weapon_retrieval_progress_epsilon := 0.5
+
+@export_group("Line Of Sight")
+## 攻击视线阻挡检测使用的碰撞层掩码。用于避免隔着墙攻击或投掷。
 @export var attack_blocked_by_mask := 1
 
 @onready var sprite: AnimatedSprite2D = $Sprite

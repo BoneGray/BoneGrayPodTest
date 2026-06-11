@@ -1,0 +1,21 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/items/weapon_pickup.gd" id="1_pickup_script"]
+[ext_resource type="Resource" path="res://resources/equipment/weapons/baseball_bat/baseball_bat_data.tres" id="2_weapon_data"]
+[ext_resource type="Texture2D" path="res://assets/equipment/weapons/baseball_bat/baseball_bat_world.png" id="3_world_texture"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_pickup"]
+size = Vector2(12, 10)
+
+[node name="BaseballBatPickup" type="Area2D"]
+z_index = 1
+collision_layer = 0
+collision_mask = 2
+script = ExtResource("1_pickup_script")
+weapon_data = ExtResource("2_weapon_data")
+
+[node name="Sprite" type="Sprite2D" parent="."]
+texture = ExtResource("3_world_texture")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape2D_pickup")

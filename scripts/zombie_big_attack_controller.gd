@@ -1,22 +1,62 @@
 extends CharacterBody2D
 
+const PSM = preload("res://scripts/player/player_state_machine.gd")
+const PIM = preload("res://scripts/player/player_input_map.gd")
+const PCC = preload("res://scripts/player/player_combat_controller.gd")
+
 signal attack_hit(target: Node)
 signal health_changed(current: int, maximum: int)
 signal died(player: Node)
+signal weapon_equipped(weapon_data: Resource)
 
+@export_group("Stats")
+## 玩家属性资源，提供生命值、移动速度、防御、默认攻击力、攻击冷却和无敌时间。
 @export var stats: Resource
+## 没有 stats 或当前武器没有覆盖攻击力时使用的备用攻击力。
 @export var damage := 10
+
+@export_group("Combat")
+## 攻击可命中的目标组名。玩家场景中通常设置为 enemy。
 @export var target_group := "player"
+## 是否根据当前朝向自动移动 AttackArea2D 的位置。
 @export var use_directional_attack_area_offsets := true
+## 空手主攻击配置。没有装备武器时，J 键会使用这个 AttackProfile。
+@export var unarmed_primary_attack_profile: Resource
+## 空手副攻击配置。当前阶段暂不绑定输入，但保留给后续扩展。
+@export var unarmed_secondary_attack_profile: Resource
+## 空手默认是否允许按住攻击键持续重复触发。单个空手 AttackProfile 可用 repeat_mode 覆盖。
+@export var unarmed_repeat_while_held := true
+## 空手按住攻击键多久后进入持续连击，单位为秒。短按会立即攻击一次。
+@export var unarmed_hold_to_repeat_delay := 0.22
+
+@export_group("Control")
+## 是否允许键盘控制。测试场景中可关闭，用于只播放动画或由脚本驱动。
 @export var keyboard_control_enabled := true
+## 没有 stats 时使用的备用移动速度，单位为像素/秒。
 @export var movement_speed := 90.0
+## 攻击动画播放期间允许移动时使用的速度倍率。
+@export_range(0.0, 1.0, 0.05) var attacking_move_speed_multiplier := 0.45
+## 主攻击键，默认 J。
 @export var primary_attack_key := KEY_J
+## 拾取/丢弃交互键，默认 E。
+@export var interact_key := KEY_E
+## 暂时空置的旧副攻击键。当前阶段 K 不执行任何功能。
 @export var secondary_attack_key := KEY_K
+
+@export_group("Camera")
+## 是否启用玩家子节点 FollowCamera2D 的跟随。
 @export var camera_follow_enabled := true
+## 玩家相机缩放比例。值越大画面越近。
 @export var camera_zoom := Vector2(3, 3)
+## 是否启用 Camera2D 的位置平滑。
 @export var camera_smoothing_enabled := true
+## 相机平滑速度。值越大越快贴近玩家。
 @export var camera_smoothing_speed := 5.0
+
+@export_group("Debug")
+## 是否在控制台输出受伤日志。
 @export var damage_log_enabled := true
+## 是否在控制台输出攻击按键和方向日志。
 @export var attack_log_enabled := true
 
 @onready var sprite: AnimatedSprite2D = $Sprite
@@ -32,9 +72,24 @@ var health := 1
 var attack_cooldown_remaining := 0.0
 var invincible_time_remaining := 0.0
 var stun_time_remaining := 0.0
-var _hit_targets: Array[Node] = []
 var _attack_active := false
 var _equipment_visual_enabled := true
+var _equipment_visual_base_position := Vector2.ZERO
+var _body_visual_base_z_index := 0
+var _equipment_visual_base_z_index := 0
+var _unarmed_visual_sprite_frames: SpriteFrames
+var _primary_attack_hold_time := 0.0
+var _primary_attack_repeat_ready := false
+var _primary_attack_buffer_time_remaining := 0.0
+var _current_attack_hit_window_reached := false
+var _current_attack_action := ""
+var _current_attack_animation := ""
+var _primary_attack_repeat_active := false
+var _ignored_restarted_attack_animation := ""
+var _player_state_machine := PSM.new()
+var _input_map := PIM.new()
+var _combat_controller := PCC.new()
+var equipped_weapon: Resource
 
 var attack_hit_frames := {
 	"attack_first": [2],
@@ -55,7 +110,20 @@ var attack_area_offsets := {
 
 
 func _ready() -> void:
+	# Run visual sync after child AnimationPlayer updates so internal body/hand layers stay authoritative.
+	process_priority = 100
+	_combat_controller.default_hit_frames = attack_hit_frames
+	_combat_controller.default_target_limits = attack_target_limits
+	_player_state_machine.reset(PSM.IDLE)
+	_input_map.primary_attack_key = primary_attack_key
+	_input_map.interact_key = interact_key
+	_input_map.unused_key = secondary_attack_key
 	health = get_max_health()
+	_body_visual_base_z_index = sprite.z_index
+	if hands_sprite != null:
+		_equipment_visual_base_position = hands_sprite.position
+		_equipment_visual_base_z_index = hands_sprite.z_index
+		_unarmed_visual_sprite_frames = hands_sprite.sprite_frames
 	sprite.frame_changed.connect(_on_frame_changed)
 	sprite.animation_finished.connect(_on_animation_finished)
 	if animation_player != null:
@@ -69,16 +137,120 @@ func _ready() -> void:
 
 func _process(_delta: float) -> void:
 	_sync_equipment_visual_to_sprite()
+	_apply_equipment_visual_layer(String(sprite.animation))
+
+
+func _change_player_state(next_state: String) -> bool:
+	return _player_state_machine.change_to(next_state)
+
+
+func _refresh_state_from_lifecycle() -> void:
+	if health <= 0:
+		_change_player_state(PSM.DEAD)
+		return
+	if stun_time_remaining > 0.0:
+		_change_player_state(PSM.STUNNED)
+		return
+	if _player_state_machine.is_state(PSM.STUNNED):
+		_change_player_state(PSM.IDLE)
+
+
+func _return_to_locomotion_state() -> void:
+	if health <= 0:
+		_change_player_state(PSM.DEAD)
+		return
+	if stun_time_remaining > 0.0:
+		_change_player_state(PSM.STUNNED)
+		_play_idle_animation_immediate(current_direction)
+		return
+
+	var movement := _get_keyboard_movement()
+	if movement == Vector2.ZERO:
+		_change_player_state(PSM.IDLE)
+		play_idle(current_direction)
+		return
+
+	var next_direction := _direction_from_vector(movement)
+	_change_player_state(PSM.MOVE)
+	play_walk(next_direction)
+
+
+func _try_cancel_startup_attack_for_turn() -> bool:
+	if not _player_state_machine.is_state(PSM.ATTACK):
+		return false
+	if _combat_controller.current_attack_phase != PCC.PHASE_STARTUP:
+		return false
+	if _get_attack_input_mode(_get_current_attack_profile()) in [PCC.INPUT_TAP_COMBO, PCC.INPUT_HOLD_REPEAT]:
+		return false
+
+	var movement := _get_keyboard_movement()
+	if movement == Vector2.ZERO:
+		return false
+
+	var requested_direction := _direction_from_vector(movement)
+	if requested_direction == current_direction:
+		return false
+
+	_cancel_startup_attack()
+	return true
+
+
+func _cancel_startup_attack() -> void:
+	if animation_player != null and animation_player.is_playing():
+		animation_player.stop()
+	if sprite.is_playing():
+		sprite.stop()
+	_clear_attack_runtime_state()
+	_change_player_state(PSM.IDLE)
+	play_idle(current_direction)
 
 
 func _physics_process(delta: float) -> void:
 	attack_cooldown_remaining = maxf(attack_cooldown_remaining - delta, 0.0)
 	invincible_time_remaining = maxf(invincible_time_remaining - delta, 0.0)
 	stun_time_remaining = maxf(stun_time_remaining - delta, 0.0)
-	if not keyboard_control_enabled or _is_locked_animation() or is_stunned():
-		velocity = Vector2.ZERO
-		if is_stunned() and not _is_locked_animation():
-			play_idle(current_direction)
+	_refresh_state_from_lifecycle()
+	_update_primary_attack_buffer(delta)
+	_update_primary_attack_hold_state(delta)
+	if _try_cancel_startup_attack_for_turn():
+		move_and_slide()
+		return
+	_turn_current_attack_to_movement_input()
+	if _try_consume_buffered_primary_attack():
+		if _can_move_during_locked_attack():
+			_apply_locked_attack_movement()
+		else:
+			velocity = Vector2.ZERO
+		move_and_slide()
+		_apply_active_attack_hits()
+		return
+	if _try_repeat_held_attack():
+		if _can_move_during_locked_attack():
+			_apply_locked_attack_movement()
+		else:
+			velocity = Vector2.ZERO
+		move_and_slide()
+		_apply_active_attack_hits()
+		return
+	if not keyboard_control_enabled or _is_locked_animation() or _player_state_machine.blocks_input():
+		if keyboard_control_enabled and _can_move_during_locked_attack():
+			_apply_locked_attack_movement()
+		else:
+			velocity = Vector2.ZERO
+		if _player_state_machine.is_state(PSM.STUNNED):
+			_play_idle_animation_immediate(current_direction)
+		move_and_slide()
+		_apply_active_attack_hits()
+		return
+
+	if _is_holding_repeat_attack():
+		_apply_locked_attack_movement()
+		move_and_slide()
+		_apply_active_attack_hits()
+		return
+
+	if _player_state_machine.is_state(PSM.ATTACK):
+		_apply_locked_attack_movement()
 		move_and_slide()
 		_apply_active_attack_hits()
 		return
@@ -99,38 +271,179 @@ func _physics_process(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not keyboard_control_enabled or _is_locked_animation() or is_stunned():
+	if not keyboard_control_enabled or _player_state_machine.blocks_input():
 		return
-	if attack_cooldown_remaining > 0.0:
+	if _input_map.is_unused_pressed(event):
 		return
-	if _is_key_pressed(event, primary_attack_key):
-		attack("attack_first", current_direction)
-	elif _is_key_pressed(event, secondary_attack_key):
-		attack("attack_second", current_direction)
+	if _input_map.is_interact_pressed(event):
+		_handle_interact_pressed()
+		return
+	if _input_map.is_primary_attack_pressed(event):
+		_handle_primary_attack_pressed()
+
+
+func _handle_interact_pressed() -> void:
+	if _player_state_machine.blocks_interaction():
+		return
+	if equipped_weapon == null:
+		_try_pickup_nearby_weapon()
+	else:
+		drop_current_weapon()
 
 
 func play_idle(direction := current_direction) -> void:
 	current_direction = direction
+	if not _is_locked_animation():
+		_clear_attack_runtime_state()
+		_change_player_state(PSM.IDLE)
 	_play_animation_if_changed("idle_%s" % current_direction)
+
+
+func _play_idle_animation_immediate(direction := current_direction) -> void:
+	current_direction = direction
+	if animation_player != null and animation_player.is_playing():
+		animation_player.stop()
+	if sprite.sprite_frames != null and sprite.sprite_frames.has_animation("idle_%s" % current_direction):
+		sprite.play("idle_%s" % current_direction)
+		_sync_equipment_visual_to_sprite()
 
 
 func play_walk(direction := current_direction) -> void:
 	current_direction = direction
+	_clear_attack_runtime_state()
+	_change_player_state(PSM.MOVE)
 	_play_animation_if_changed("walk_%s" % current_direction)
 
 
 func attack(action := "attack_first", direction := current_direction) -> void:
 	current_direction = direction
-	attack_cooldown_remaining = get_attack_cooldown()
+	var attack_profile := _get_attack_profile(action)
+	if equipped_weapon != null and attack_profile == null and action == "attack_second":
+		return
+	action = _get_profile_animation_action(attack_profile, action)
+	var animation_name := _animation_name(action, current_direction)
+	if animation_player != null and animation_player.has_animation(animation_name):
+		if String(animation_player.current_animation) == animation_name:
+			_ignored_restarted_attack_animation = animation_name
+			animation_player.stop()
+	elif sprite.sprite_frames != null and sprite.sprite_frames.has_animation(animation_name):
+		if sprite.animation == StringName(animation_name):
+			sprite.stop()
+	_combat_controller.begin_attack(attack_profile, action, animation_name, PCC.PHASE_STARTUP)
+	_sync_current_attack_debug_fields()
+	_change_player_state(PSM.ATTACK)
+	set_meta("current_attack_profile", attack_profile)
+	attack_cooldown_remaining = get_attack_cooldown(attack_profile)
 	set_meta("current_attack_action", action)
 	if attack_log_enabled:
 		print("%s 使用%s攻击，方向 %s" % [get_display_name(), _attack_key_label_for_action(action), current_direction])
-	_hit_targets.clear()
+	_combat_controller.clear_hit_targets()
 	_set_attack_active(false)
-	var animation_name := _animation_name(action, current_direction)
 	if animation_player != null and animation_player.has_animation(animation_name):
 		animation_player.play(animation_name)
 		_sync_equipment_visual_to_animation(animation_name)
+		call_deferred("_apply_equipment_visual_layer", animation_name)
+	elif sprite.sprite_frames != null and sprite.sprite_frames.has_animation(animation_name):
+		sprite.play(animation_name)
+		_sync_equipment_visual_to_sprite()
+	if _get_profile_attack_type(attack_profile) == PCC.ATTACK_TYPE_PROJECTILE:
+		_set_current_attack_phase(PCC.PHASE_ACTIVE)
+		_execute_projectile_attack(attack_profile, animation_name)
+		_set_current_attack_phase(PCC.PHASE_RECOVERY)
+
+
+func _begin_primary_attack() -> void:
+	_combat_controller.clear_primary_attack_input_state()
+	_sync_primary_attack_input_debug_fields()
+	attack("attack_first", current_direction)
+
+
+func _handle_primary_attack_pressed() -> void:
+	if _can_start_primary_attack_now():
+		_begin_primary_attack()
+		return
+	_buffer_primary_attack_input()
+	_try_consume_buffered_primary_attack()
+
+
+func _buffer_primary_attack_input() -> void:
+	var attack_profile := _get_attack_profile("attack_first")
+	if _get_attack_input_mode(attack_profile) != PCC.INPUT_TAP_COMBO:
+		return
+	var buffer_time := _get_attack_input_buffer_time(attack_profile)
+	if buffer_time <= 0.0:
+		return
+	_combat_controller.set_primary_attack_buffer_time(buffer_time)
+	_sync_primary_attack_input_debug_fields()
+
+
+func _update_primary_attack_buffer(delta: float) -> void:
+	_sync_primary_attack_input_controller_from_debug_fields()
+	_combat_controller.update_primary_attack_buffer(delta)
+	_sync_primary_attack_input_debug_fields()
+
+
+func _try_consume_buffered_primary_attack() -> bool:
+	_sync_primary_attack_input_controller_from_debug_fields()
+	if not _combat_controller.has_primary_attack_buffer():
+		return false
+	if _can_start_primary_attack_now() or _can_cancel_current_primary_attack():
+		_begin_primary_attack()
+		return true
+	return false
+
+
+func _can_start_primary_attack_now() -> bool:
+	return keyboard_control_enabled and not _player_state_machine.blocks_attack() and not _is_locked_animation() and attack_cooldown_remaining <= 0.0
+
+
+func _can_cancel_current_primary_attack() -> bool:
+	if not keyboard_control_enabled or _player_state_machine.blocks_attack():
+		return false
+	if _combat_controller.current_attack_action != "attack_first":
+		return false
+
+	var attack_profile := _get_current_attack_profile()
+	if _get_attack_input_mode(attack_profile) != PCC.INPUT_TAP_COMBO:
+		return false
+	if _get_profile_attack_type(attack_profile) != PCC.ATTACK_TYPE_MELEE:
+		return false
+
+	var cancel_last_frames := _get_attack_cancel_last_frames(attack_profile)
+	if cancel_last_frames <= 0:
+		return false
+	if sprite.sprite_frames == null or not sprite.sprite_frames.has_animation(sprite.animation):
+		return false
+
+	var action_name := _action_from_animation(sprite.animation)
+	if action_name != "attack_first":
+		return false
+
+	var frame_count := sprite.sprite_frames.get_frame_count(sprite.animation)
+	if frame_count <= 0:
+		return false
+
+	var hit_frames := _get_attack_hit_frames(attack_profile, action_name)
+	if not _current_attack_hit_window_reached:
+		return false
+	if not hit_frames.is_empty() and sprite.frame < _get_last_hit_frame(hit_frames):
+		return false
+
+	var remaining_frames := frame_count - 1 - sprite.frame
+	return remaining_frames >= 0 and remaining_frames < cancel_last_frames
+
+
+func play_pickup(direction := current_direction) -> void:
+	if _player_state_machine.blocks_interaction():
+		return
+	current_direction = direction
+	_change_player_state(PSM.PICKUP)
+	_set_attack_active(false)
+	var animation_name := _animation_name("pickup", current_direction)
+	if animation_player != null and animation_player.has_animation(animation_name):
+		animation_player.play(animation_name)
+		_sync_equipment_visual_to_animation(animation_name)
+		call_deferred("_apply_equipment_visual_layer", animation_name)
 	elif sprite.sprite_frames != null and sprite.sprite_frames.has_animation(animation_name):
 		sprite.play(animation_name)
 		_sync_equipment_visual_to_sprite()
@@ -139,28 +452,72 @@ func attack(action := "attack_first", direction := current_direction) -> void:
 func _on_frame_changed() -> void:
 	_update_direction_from_animation()
 	_sync_equipment_visual_to_sprite()
-	var action_name := _action_from_animation(sprite.animation)
-	if not attack_hit_frames.has(action_name):
+	var attack_profile := _get_current_attack_profile()
+	if _get_profile_attack_type(attack_profile) == PCC.ATTACK_TYPE_PROJECTILE:
 		_set_attack_active(false)
 		return
 
-	var hit_frames: Array = attack_hit_frames[action_name]
+	var action_name := _action_from_animation(sprite.animation)
+	var hit_frames := _get_attack_hit_frames(attack_profile, action_name)
+	if hit_frames.is_empty():
+		_set_attack_active(false)
+		return
+
 	var should_hit := sprite.frame in hit_frames
+	_update_current_attack_phase(hit_frames)
 	_set_attack_active(should_hit)
 	if should_hit:
+		_set_current_attack_phase(PCC.PHASE_ACTIVE)
+		_mark_current_attack_hit_window_reached()
 		_apply_attack_hits()
 
 
+func _update_current_attack_phase(hit_frames: Array) -> void:
+	if _combat_controller.current_attack_action == "" or hit_frames.is_empty():
+		return
+
+	var first_hit_frame := _get_first_hit_frame(hit_frames)
+	var last_hit_frame := _get_last_hit_frame(hit_frames)
+	if sprite.frame < first_hit_frame:
+		_set_current_attack_phase(PCC.PHASE_STARTUP)
+	elif sprite.frame in hit_frames:
+		_set_current_attack_phase(PCC.PHASE_ACTIVE)
+	elif sprite.frame > last_hit_frame:
+		_set_current_attack_phase(PCC.PHASE_RECOVERY)
+
+
 func _on_animation_finished() -> void:
-	_set_attack_active(false)
-	if _action_from_animation(sprite.animation).begins_with("attack_"):
-		play_idle(current_direction)
+	if _ignored_restarted_attack_animation == String(sprite.animation):
+		_ignored_restarted_attack_animation = ""
+		return
+	var action_name := _action_from_animation(sprite.animation)
+	if action_name.begins_with("attack_") or action_name == "pickup":
+		if action_name.begins_with("attack_"):
+			var finished_attack_profile := _get_current_attack_profile()
+			_set_current_attack_phase(PCC.PHASE_FINISHED)
+			_clear_attack_runtime_state()
+			_clear_tap_combo_cooldown_after_animation(finished_attack_profile)
+		else:
+			_set_attack_active(false)
+			_change_player_state(PSM.IDLE)
+		_return_to_locomotion_state()
 
 
 func _on_animation_player_finished(animation_name: StringName) -> void:
-	_set_attack_active(false)
-	if _action_from_animation(animation_name).begins_with("attack_"):
-		play_idle(current_direction)
+	if _ignored_restarted_attack_animation == String(animation_name):
+		_ignored_restarted_attack_animation = ""
+		return
+	var action_name := _action_from_animation(animation_name)
+	if action_name.begins_with("attack_") or action_name == "pickup":
+		if action_name.begins_with("attack_"):
+			var finished_attack_profile := _get_current_attack_profile()
+			_set_current_attack_phase(PCC.PHASE_FINISHED)
+			_clear_attack_runtime_state()
+			_clear_tap_combo_cooldown_after_animation(finished_attack_profile)
+		else:
+			_set_attack_active(false)
+			_change_player_state(PSM.IDLE)
+		_return_to_locomotion_state()
 
 
 func _set_attack_active(active: bool) -> void:
@@ -172,32 +529,51 @@ func _set_attack_active(active: bool) -> void:
 
 func _apply_attack_hits() -> void:
 	var max_targets := _get_current_attack_max_targets()
-	if max_targets > 0 and _hit_targets.size() >= max_targets:
-		return
-
-	var hit_targets := _collect_attack_hit_targets()
-	var applied_count := 0
+	var hit_targets := _combat_controller.collect_new_hit_targets(_collect_attack_hit_targets(), max_targets)
 	for hit_target in hit_targets:
-		if hit_target in _hit_targets:
-			continue
-
-		_hit_targets.append(hit_target)
 		if hit_target.has_method("take_damage"):
 			hit_target.take_damage(get_attack_power())
 		attack_hit.emit(hit_target)
 
-		applied_count += 1
-		if max_targets > 0 and _hit_targets.size() >= max_targets:
-			return
-
 
 func _apply_active_attack_hits() -> void:
-	if attack_area.monitoring and not attack_shape.disabled:
-		_apply_attack_hits()
+	if _get_profile_attack_type(_get_current_attack_profile()) == PCC.ATTACK_TYPE_PROJECTILE:
+		return
+	if not _is_current_melee_hit_frame_active():
+		_set_attack_active(false)
+		return
+	_apply_attack_hits()
+
+
+func _is_current_melee_hit_frame_active() -> bool:
+	return _combat_controller.is_current_melee_hit_frame_active(
+		_attack_active,
+		sprite.animation,
+		sprite.frame,
+		_action_from_animation(sprite.animation)
+	)
+
+
+func _clear_attack_runtime_state() -> void:
+	_combat_controller.clear_runtime(PCC.PHASE_NONE)
+	_sync_current_attack_debug_fields()
+	_sync_primary_attack_input_debug_fields()
+	if has_meta("current_attack_profile"):
+		remove_meta("current_attack_profile")
+	if has_meta("current_attack_action"):
+		remove_meta("current_attack_action")
+	_set_attack_active(false)
+
+
+func _clear_tap_combo_cooldown_after_animation(attack_profile: Resource) -> void:
+	if _get_attack_input_mode(attack_profile) == PCC.INPUT_TAP_COMBO:
+		attack_cooldown_remaining = 0.0
 
 
 func _collect_attack_hit_targets() -> Array[Node]:
 	var hit_targets: Array[Node] = []
+	if not attack_area.monitoring:
+		return hit_targets
 	for body in attack_area.get_overlapping_bodies():
 		_append_hit_target(hit_targets, body)
 	for area in attack_area.get_overlapping_areas():
@@ -225,16 +601,65 @@ func _attack_target_distance_squared(target: Node) -> float:
 
 
 func _get_current_attack_max_targets() -> int:
-	var action := String(get_meta("current_attack_action", "attack_first"))
-	return attack_target_limits.get(action, 1)
+	var attack_profile := _get_current_attack_profile()
+	var action := _get_current_attack_action_name()
+	return _combat_controller.get_attack_max_targets(attack_profile, action)
 
 
 func _get_current_attack_hit_count() -> int:
-	return _hit_targets.size()
+	return _combat_controller.get_hit_count()
+
+
+func _get_current_attack_action_name() -> String:
+	if _current_attack_action != "":
+		return _current_attack_action
+	if has_meta("current_attack_action"):
+		return String(get_meta("current_attack_action"))
+	return "attack_first"
+
+
+func _get_attack_profile(action: String) -> Resource:
+	return _combat_controller.get_attack_profile(equipped_weapon, unarmed_primary_attack_profile, unarmed_secondary_attack_profile, action)
+
+
+func _get_current_attack_profile() -> Resource:
+	return _combat_controller.current_attack_profile
+
+
+func _get_profile_animation_action(attack_profile: Resource, fallback_action: String) -> String:
+	return _combat_controller.get_profile_animation_action(attack_profile, fallback_action)
+
+
+func _get_profile_attack_type(attack_profile: Resource) -> String:
+	return _combat_controller.get_profile_attack_type(attack_profile)
+
+
+func _get_attack_input_mode(attack_profile: Resource) -> String:
+	return _combat_controller.get_attack_input_mode(attack_profile, equipped_weapon)
+
+
+func _get_attack_hit_frames(attack_profile: Resource, action_name: String) -> Array:
+	return _combat_controller.get_attack_hit_frames(attack_profile, action_name)
+
+
+func _get_last_hit_frame(hit_frames: Array) -> int:
+	return _combat_controller.get_last_hit_frame(hit_frames)
+
+
+func _get_first_hit_frame(hit_frames: Array) -> int:
+	return _combat_controller.get_first_hit_frame(hit_frames)
+
+
+func _get_attack_input_buffer_time(attack_profile: Resource) -> float:
+	return _combat_controller.get_attack_input_buffer_time(attack_profile)
+
+
+func _get_attack_cancel_last_frames(attack_profile: Resource) -> int:
+	return _combat_controller.get_attack_cancel_last_frames(attack_profile)
 
 
 func _reset_current_attack_hits() -> void:
-	_hit_targets.clear()
+	_combat_controller.clear_hit_targets()
 
 
 func _resolve_hit_target(target: Node) -> Node:
@@ -263,6 +688,286 @@ func _update_attack_area_transform() -> void:
 		attack_area.position = attack_area_offsets.get(current_direction, Vector2(10, 1))
 
 
+func _execute_projectile_attack(attack_profile: Resource, animation_name: String) -> void:
+	if attack_profile == null:
+		return
+
+	var projectile_scene := attack_profile.get("projectile_scene") as PackedScene
+	if projectile_scene == null:
+		return
+
+	var projectile := projectile_scene.instantiate() as Node2D
+	if projectile == null:
+		return
+
+	var parent := get_parent()
+	if parent == null:
+		parent = get_tree().current_scene
+	if parent == null:
+		projectile.queue_free()
+		return
+
+	parent.add_child(projectile)
+	projectile.global_position = _projectile_spawn_position()
+	if projectile.has_method("launch"):
+		projectile.launch(self, _direction_vector_from_name(current_direction), attack_profile, target_group)
+	_spawn_muzzle_flash(attack_profile, animation_name)
+	_spawn_bullet_casing(attack_profile, animation_name)
+
+
+func _projectile_spawn_position() -> Vector2:
+	var offset: Vector2 = attack_area_offsets.get(current_direction, Vector2(10, 1))
+	return global_position + offset
+
+
+func _spawn_muzzle_flash(attack_profile: Resource, animation_name: String) -> void:
+	var muzzle_flash_scene := attack_profile.get("muzzle_flash_scene") as PackedScene
+	if muzzle_flash_scene == null:
+		return
+
+	var parent := get_parent()
+	if parent == null:
+		parent = get_tree().current_scene
+	if parent == null:
+		return
+
+	var muzzle_flash := _spawn_effect_node(muzzle_flash_scene, parent, "muzzle_flash", int(attack_profile.get("muzzle_flash_pool_limit")))
+	if muzzle_flash == null:
+		return
+	muzzle_flash.global_position = global_position + _equipment_visual_offset_for_animation(animation_name) + _muzzle_flash_offset(attack_profile)
+	if muzzle_flash.has_method("play"):
+		muzzle_flash.play(current_direction)
+
+
+func _muzzle_flash_offset(attack_profile: Resource) -> Vector2:
+	if current_direction == "side_left":
+		return attack_profile.get("muzzle_flash_offset_side_left")
+	if current_direction == "up":
+		return attack_profile.get("muzzle_flash_offset_up")
+	if current_direction == "down":
+		return attack_profile.get("muzzle_flash_offset_down")
+	return attack_profile.get("muzzle_flash_offset_side")
+
+
+func _spawn_bullet_casing(attack_profile: Resource, animation_name: String) -> void:
+	var casing_scene := attack_profile.get("casing_scene") as PackedScene
+	if casing_scene == null:
+		return
+
+	var parent := get_parent()
+	if parent == null:
+		parent = get_tree().current_scene
+	if parent == null:
+		return
+
+	var casing := _spawn_effect_node(casing_scene, parent, "bullet_casing", int(attack_profile.get("casing_pool_limit")))
+	if casing == null:
+		return
+	var eject_direction := _casing_eject_direction()
+	casing.global_position = global_position + _equipment_visual_offset_for_animation(animation_name) + _casing_offset(attack_profile) + _casing_left_eject_spawn_offset(eject_direction)
+	casing.set_meta("spawn_position", casing.global_position)
+	if casing.has_method("launch"):
+		var eject_speed := float(attack_profile.get("casing_eject_speed"))
+		var speed_variance := float(attack_profile.get("casing_speed_variance"))
+		var varied_speed := eject_speed + randf_range(-speed_variance, speed_variance)
+		casing.launch(eject_direction, varied_speed, float(attack_profile.get("casing_lifetime")))
+
+
+func _casing_offset(attack_profile: Resource) -> Vector2:
+	if current_direction == "side_left":
+		return attack_profile.get("casing_offset_side_left")
+	if current_direction == "up":
+		return attack_profile.get("casing_offset_up")
+	if current_direction == "down":
+		return attack_profile.get("casing_offset_down")
+	return attack_profile.get("casing_offset_side")
+
+
+func _casing_eject_direction() -> Vector2:
+	if current_direction == "side_left":
+		return Vector2(1.0, -0.35)
+	if current_direction == "side":
+		return Vector2(-1.0, -0.35)
+	if current_direction == "up":
+		return Vector2(_random_casing_side(), randf_range(0.05, 0.35))
+	return Vector2(_random_casing_side(), randf_range(-0.4, -0.1))
+
+
+func _casing_left_eject_spawn_offset(eject_direction: Vector2) -> Vector2:
+	if not current_direction in ["up", "down"] or eject_direction.x >= 0.0:
+		return Vector2.ZERO
+	return Vector2(randf_range(-4.0, -2.0), 0.0)
+
+
+func _random_casing_side() -> float:
+	return -1.0 if randf() < 0.5 else 1.0
+
+
+func _spawn_effect_node(effect_scene: PackedScene, parent: Node, category: String, limit: int) -> Node2D:
+	var effect_manager := get_node_or_null("/root/EffectManager")
+	if effect_manager != null and effect_manager.has_method("spawn_effect"):
+		return effect_manager.spawn_effect(effect_scene, parent, category, limit) as Node2D
+	var effect := effect_scene.instantiate() as Node2D
+	if effect != null:
+		parent.add_child(effect)
+	return effect
+
+
+func _try_repeat_held_attack() -> bool:
+	_sync_primary_attack_input_controller_from_debug_fields()
+	if not keyboard_control_enabled or is_stunned() or attack_cooldown_remaining > 0.0:
+		return false
+	if _is_locked_animation() and not _can_repeat_during_locked_attack():
+		return false
+	if _combat_controller.is_primary_attack_repeat_ready() and _should_repeat_attack("attack_first"):
+		_combat_controller.set_primary_attack_repeat_active(true)
+		_sync_primary_attack_input_debug_fields()
+		attack("attack_first", current_direction)
+		return true
+	return false
+
+
+func _should_repeat_attack(action: String) -> bool:
+	var attack_profile := _get_attack_profile(action)
+	if _get_attack_input_mode(attack_profile) != PCC.INPUT_HOLD_REPEAT:
+		return false
+	return _is_repeat_attack_enabled(attack_profile)
+
+
+func _can_repeat_during_locked_attack() -> bool:
+	var attack_profile := _get_current_attack_profile()
+	if attack_profile == null:
+		attack_profile = _get_attack_profile("attack_first")
+	if _get_attack_input_mode(attack_profile) != PCC.INPUT_HOLD_REPEAT:
+		return false
+	return _is_repeat_attack_enabled(attack_profile)
+
+
+func _is_repeat_attack_enabled(attack_profile: Resource) -> bool:
+	return _combat_controller.is_repeat_attack_enabled(attack_profile, equipped_weapon, unarmed_repeat_while_held)
+
+
+func _is_holding_repeat_attack() -> bool:
+	_sync_primary_attack_input_controller_from_debug_fields()
+	return _combat_controller.is_primary_attack_repeat_ready() and _should_repeat_attack("attack_first")
+
+
+func _update_primary_attack_hold_state(delta: float) -> void:
+	_sync_primary_attack_input_controller_from_debug_fields()
+	if not _is_key_currently_pressed(primary_attack_key):
+		if _combat_controller.primary_attack_repeat_active:
+			_cancel_primary_attack_repeat()
+		_combat_controller.clear_primary_attack_hold_state()
+		_sync_primary_attack_input_debug_fields()
+		return
+
+	if not _should_repeat_attack("attack_first"):
+		_combat_controller.clear_primary_attack_hold_state()
+		_sync_primary_attack_input_debug_fields()
+		return
+
+	_combat_controller.update_primary_attack_hold_state(delta, true, _get_hold_to_repeat_delay(_get_attack_profile("attack_first")))
+	_sync_primary_attack_input_debug_fields()
+
+
+func _cancel_primary_attack_repeat() -> void:
+	if _action_from_animation(sprite.animation) == "attack_first":
+		if animation_player != null and animation_player.is_playing():
+			animation_player.stop()
+		_clear_attack_runtime_state()
+		attack_cooldown_remaining = 0.0
+		_return_to_locomotion_state()
+
+
+func _get_hold_to_repeat_delay(attack_profile: Resource) -> float:
+	return _combat_controller.get_hold_to_repeat_delay(attack_profile, equipped_weapon, unarmed_hold_to_repeat_delay)
+
+
+func _can_move_during_locked_attack() -> bool:
+	return _player_state_machine.is_state(PSM.ATTACK)
+
+
+func _apply_locked_attack_movement() -> void:
+	var movement := _get_keyboard_movement()
+	if movement == Vector2.ZERO:
+		velocity = Vector2.ZERO
+		return
+	if _can_turn_during_current_attack():
+		_turn_current_attack_to_direction(_direction_from_vector(movement))
+	velocity = movement.normalized() * get_move_speed() * attacking_move_speed_multiplier
+
+
+func _turn_current_attack_to_movement_input() -> void:
+	if not _player_state_machine.is_state(PSM.ATTACK) or not _can_turn_during_current_attack():
+		return
+	var movement := _get_keyboard_movement()
+	if movement == Vector2.ZERO:
+		return
+	_turn_current_attack_to_direction(_direction_from_vector(movement))
+
+
+func _can_turn_during_current_attack() -> bool:
+	var attack_profile := _get_current_attack_profile()
+	var input_mode := _get_attack_input_mode(attack_profile)
+	return input_mode == PCC.INPUT_TAP_COMBO
+
+
+func _turn_current_attack_to_direction(next_direction: String) -> void:
+	if next_direction == "" or next_direction == current_direction:
+		return
+	current_direction = next_direction
+	_update_attack_area_transform()
+	if _combat_controller.current_attack_action == "":
+		return
+
+	var next_animation := _animation_name(_combat_controller.current_attack_action, current_direction)
+	if next_animation == _combat_controller.current_attack_animation:
+		return
+
+	var current_frame := sprite.frame
+	var was_playing := sprite.is_playing()
+	_combat_controller.update_attack_animation(next_animation)
+	_sync_current_attack_debug_fields()
+	if animation_player != null and animation_player.has_animation(next_animation):
+		var seek_time := _animation_time_for_frame(next_animation, current_frame)
+		animation_player.play(next_animation)
+		if seek_time > 0.0:
+			animation_player.seek(seek_time, true)
+		_sync_equipment_visual_to_animation(next_animation, sprite.frame, was_playing)
+		call_deferred("_apply_equipment_visual_layer", next_animation)
+		return
+
+	if sprite.sprite_frames == null or not sprite.sprite_frames.has_animation(next_animation):
+		return
+	sprite.animation = StringName(next_animation)
+	var frame_count := sprite.sprite_frames.get_frame_count(next_animation)
+	sprite.frame = mini(current_frame, maxi(frame_count - 1, 0))
+	if was_playing:
+		sprite.play()
+	else:
+		sprite.stop()
+	_sync_equipment_visual_to_sprite()
+
+
+func _animation_time_for_frame(animation_name: String, frame: int) -> float:
+	if sprite.sprite_frames == null or not sprite.sprite_frames.has_animation(animation_name):
+		return 0.0
+	var animation_speed := float(sprite.sprite_frames.get_animation_speed(animation_name))
+	if animation_speed <= 0.0:
+		return 0.0
+	return maxf(float(frame), 0.0) / animation_speed
+
+
+func _direction_vector_from_name(direction_name: String) -> Vector2:
+	if direction_name == "side_left":
+		return Vector2.LEFT
+	if direction_name == "up":
+		return Vector2.UP
+	if direction_name == "down":
+		return Vector2.DOWN
+	return Vector2.RIGHT
+
+
 func _action_from_animation(animation_name: StringName) -> String:
 	var name := String(animation_name)
 	var parts := name.split("_", false)
@@ -286,6 +991,73 @@ func configure_stats(new_stats: Resource) -> void:
 	health_changed.emit(health, get_max_health())
 
 
+func equip_weapon(weapon_data: Resource) -> void:
+	if weapon_data == null:
+		return
+
+	equipped_weapon = weapon_data
+	var visual_sprite_frames := weapon_data.get("visual_sprite_frames") as SpriteFrames
+	if visual_sprite_frames != null:
+		equip_weapon_visual(visual_sprite_frames)
+	play_pickup(current_direction)
+	weapon_equipped.emit(weapon_data)
+
+
+func drop_current_weapon() -> bool:
+	if equipped_weapon == null:
+		return false
+
+	var pickup_scene_path := String(equipped_weapon.get("pickup_scene_path"))
+	if pickup_scene_path == "":
+		return false
+
+	var pickup_scene := load(pickup_scene_path) as PackedScene
+	if pickup_scene == null:
+		return false
+
+	var pickup := pickup_scene.instantiate() as Node2D
+	if pickup == null:
+		return false
+
+	var drop_parent := get_parent()
+	if drop_parent == null:
+		drop_parent = get_tree().current_scene
+	if drop_parent == null:
+		pickup.queue_free()
+		return false
+
+	drop_parent.add_child(pickup)
+	pickup.global_position = global_position + _direction_vector_from_name(current_direction) * 18.0
+	pickup.set("weapon_data", equipped_weapon)
+
+	equipped_weapon = null
+	_clear_attack_runtime_state()
+	attack_cooldown_remaining = 0.0
+	clear_weapon_visual()
+	play_idle(current_direction)
+	weapon_equipped.emit(null)
+	return true
+
+
+func _try_pickup_nearby_weapon() -> bool:
+	var nearest_pickup: Node2D
+	var nearest_distance := INF
+	for pickup in get_tree().get_nodes_in_group("weapon_pickup"):
+		if not pickup.has_method("can_be_picked_by") or not pickup.can_be_picked_by(self):
+			continue
+		var pickup_2d := pickup as Node2D
+		if pickup_2d == null:
+			continue
+		var distance := global_position.distance_to(pickup_2d.global_position)
+		if distance < nearest_distance:
+			nearest_distance = distance
+			nearest_pickup = pickup_2d
+
+	if nearest_pickup == null or not nearest_pickup.has_method("pickup_by"):
+		return false
+	return bool(nearest_pickup.pickup_by(self))
+
+
 func equip_weapon_visual(sprite_frames: SpriteFrames) -> void:
 	if hands_sprite == null:
 		return
@@ -299,8 +1071,11 @@ func clear_weapon_visual() -> void:
 	if hands_sprite == null:
 		return
 
-	_equipment_visual_enabled = false
-	hands_sprite.hide()
+	# Clearing a weapon returns the layered hand sprite to the unarmed hand set.
+	_equipment_visual_enabled = _unarmed_visual_sprite_frames != null
+	hands_sprite.position = _equipment_visual_base_position
+	hands_sprite.sprite_frames = _unarmed_visual_sprite_frames
+	_sync_equipment_visual_to_sprite()
 
 
 func take_damage(amount: int) -> void:
@@ -323,7 +1098,8 @@ func die() -> void:
 		return
 
 	velocity = Vector2.ZERO
-	_set_attack_active(false)
+	_change_player_state(PSM.DEAD)
+	_clear_attack_runtime_state()
 	var death_animation := _animation_name("death_first", current_direction)
 	if sprite.sprite_frames != null and sprite.sprite_frames.has_animation(death_animation):
 		sprite.play(death_animation)
@@ -342,6 +1118,43 @@ func get_current_health() -> int:
 	return health
 
 
+func get_player_state() -> String:
+	return _player_state_machine.current_state
+
+
+func get_attack_phase() -> String:
+	return _combat_controller.current_attack_phase
+
+
+func _set_current_attack_phase(phase: String) -> void:
+	_combat_controller.set_attack_phase(phase)
+
+
+func _mark_current_attack_hit_window_reached() -> void:
+	_combat_controller.mark_hit_window_reached()
+	_current_attack_hit_window_reached = true
+
+
+func _sync_current_attack_debug_fields() -> void:
+	_current_attack_action = _combat_controller.current_attack_action
+	_current_attack_animation = _combat_controller.current_attack_animation
+	_current_attack_hit_window_reached = _combat_controller.current_attack_hit_window_reached
+
+
+func _sync_primary_attack_input_debug_fields() -> void:
+	_primary_attack_hold_time = _combat_controller.primary_attack_hold_time
+	_primary_attack_repeat_ready = _combat_controller.primary_attack_repeat_ready
+	_primary_attack_buffer_time_remaining = _combat_controller.primary_attack_buffer_time_remaining
+	_primary_attack_repeat_active = _combat_controller.primary_attack_repeat_active
+
+
+func _sync_primary_attack_input_controller_from_debug_fields() -> void:
+	_combat_controller.primary_attack_hold_time = _primary_attack_hold_time
+	_combat_controller.primary_attack_repeat_ready = _primary_attack_repeat_ready
+	_combat_controller.primary_attack_buffer_time_remaining = _primary_attack_buffer_time_remaining
+	_combat_controller.primary_attack_repeat_active = _primary_attack_repeat_active
+
+
 func is_alive() -> bool:
 	return health > 0
 
@@ -352,8 +1165,10 @@ func apply_status_effect(effect_name: String, duration: float, _source: Node = n
 	if effect_name == "stun":
 		stun_time_remaining = maxf(stun_time_remaining, duration)
 		velocity = Vector2.ZERO
-		_set_attack_active(false)
-		play_idle(current_direction)
+		_change_player_state(PSM.STUNNED)
+		_clear_attack_runtime_state()
+		attack_cooldown_remaining = 0.0
+		_play_idle_animation_immediate(current_direction)
 
 
 func is_stunned() -> bool:
@@ -373,7 +1188,8 @@ func get_defense() -> int:
 
 
 func get_attack_power() -> int:
-	return stats.attack_power if stats != null else damage
+	var fallback_attack_power: int = stats.attack_power if stats != null else damage
+	return _combat_controller.get_attack_power(_get_current_attack_profile(), equipped_weapon, fallback_attack_power)
 
 
 func _attack_key_label_for_action(action: String) -> String:
@@ -384,8 +1200,13 @@ func _attack_key_label_for_action(action: String) -> String:
 	return action
 
 
-func get_attack_cooldown() -> float:
-	return stats.attack_cooldown if stats != null else 0.35
+func get_attack_cooldown(attack_profile: Resource = null) -> float:
+	if attack_profile == null:
+		attack_profile = _get_attack_profile("attack_first")
+	var fallback_cooldown: float = stats.attack_cooldown if stats != null else 0.35
+	if attack_profile == _get_current_attack_profile():
+		return _combat_controller.get_attack_start_cooldown(attack_profile, equipped_weapon, fallback_cooldown)
+	return _combat_controller.get_attack_cooldown(attack_profile, equipped_weapon, fallback_cooldown)
 
 
 func get_invincible_time() -> float:
@@ -422,9 +1243,13 @@ func _is_key_pressed(event: InputEvent, key: int) -> bool:
 	return key_event.keycode == key or key_event.physical_keycode == key
 
 
+func _is_key_currently_pressed(key: int) -> bool:
+	return Input.is_key_pressed(key) or Input.is_physical_key_pressed(key)
+
+
 func _is_locked_animation() -> bool:
 	var action_name := _action_from_animation(sprite.animation)
-	return action_name.begins_with("attack_") or action_name.begins_with("death_")
+	return action_name.begins_with("attack_") or action_name.begins_with("death_") or action_name == "pickup"
 
 
 func _play_animation_if_changed(animation_name: String) -> void:
@@ -475,11 +1300,13 @@ func _sync_equipment_visual_to_animation(animation_name: String, frame := 0, pla
 	if hands_sprite == null or hands_sprite.sprite_frames == null or not _equipment_visual_enabled:
 		return
 
+	_apply_equipment_visual_offset(animation_name)
 	if not hands_sprite.sprite_frames.has_animation(animation_name):
 		hands_sprite.hide()
 		return
 
 	hands_sprite.show()
+	_apply_equipment_visual_layer(animation_name)
 	if hands_sprite.animation != StringName(animation_name):
 		hands_sprite.animation = StringName(animation_name)
 	hands_sprite.frame = mini(frame, hands_sprite.sprite_frames.get_frame_count(animation_name) - 1)
@@ -488,6 +1315,49 @@ func _sync_equipment_visual_to_animation(animation_name: String, frame := 0, pla
 		hands_sprite.play()
 	elif not playing and hands_sprite.is_playing():
 		hands_sprite.stop()
+
+
+func _apply_equipment_visual_offset(animation_name: String) -> void:
+	if hands_sprite == null:
+		return
+
+	hands_sprite.position = _equipment_visual_base_position + _equipment_visual_offset_for_animation(animation_name)
+
+
+func _equipment_visual_offset_for_animation(animation_name: String) -> Vector2:
+	var visual_offset := Vector2.ZERO
+	if equipped_weapon != null:
+		var direction_name := _direction_from_animation(StringName(animation_name))
+		if direction_name == "down":
+			visual_offset = equipped_weapon.get("visual_offset_down")
+		elif direction_name == "up":
+			visual_offset = equipped_weapon.get("visual_offset_up")
+		elif direction_name == "side_left":
+			visual_offset = equipped_weapon.get("visual_offset_side_left")
+		else:
+			visual_offset = equipped_weapon.get("visual_offset_side")
+		var animation_offsets = equipped_weapon.get("animation_visual_offsets")
+		if animation_offsets is Dictionary:
+			var animation_offset = animation_offsets.get(animation_name, animation_offsets.get(StringName(animation_name), Vector2.ZERO))
+			if animation_offset is Vector2:
+				visual_offset += animation_offset
+	return visual_offset
+
+
+func _apply_equipment_visual_layer(animation_name: String) -> void:
+	if hands_sprite == null:
+		return
+
+	if _should_draw_hands_behind_body(animation_name):
+		sprite.z_index = _body_visual_base_z_index
+		hands_sprite.z_index = _equipment_visual_base_z_index - 1
+	else:
+		sprite.z_index = _body_visual_base_z_index - 1
+		hands_sprite.z_index = _equipment_visual_base_z_index
+
+
+func _should_draw_hands_behind_body(animation_name: String) -> bool:
+	return _direction_from_animation(StringName(animation_name)) == "up"
 
 
 func _flash_hurt() -> void:

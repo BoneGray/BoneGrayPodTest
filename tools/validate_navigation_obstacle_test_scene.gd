@@ -30,13 +30,33 @@ func _run() -> void:
 	await physics_frame
 
 	var navigation_region := root.get_node_or_null("NavigationRegion2D") as NavigationRegion2D
-	var player := root.get_node_or_null("Player") as CharacterBody2D
-	var enemies := root.find_children("NavEnemy*", "CharacterBody2D", false, false)
-	var big_enemies := root.find_children("NavBig*", "CharacterBody2D", false, false)
-	var axe_enemy := root.get_node_or_null("EnemyZombieAxe") as CharacterBody2D
+	var world_actors := root.get_node_or_null("WorldActors") as Node2D
+	var player := root.get_node_or_null("WorldActors/Player") as CharacterBody2D
+	var enemies := world_actors.find_children("NavEnemy*", "CharacterBody2D", false, false) if world_actors != null else []
+	var big_enemies := world_actors.find_children("NavBig*", "CharacterBody2D", false, false) if world_actors != null else []
+	var axe_enemy := root.get_node_or_null("WorldActors/EnemyZombieAxe") as CharacterBody2D
 	var obstacles := root.find_children("*", "StaticBody2D", false, false)
-	if navigation_region == null or player == null or axe_enemy == null or enemies.size() < 1 or big_enemies.size() < 1:
+	if navigation_region == null or world_actors == null or player == null or axe_enemy == null or enemies.size() < 1 or big_enemies.size() < 1:
 		_fail(root, "Navigation obstacle test scene is missing required gameplay nodes.")
+		return
+	if not world_actors.y_sort_enabled:
+		_fail(root, "WorldActors should enable y-sort for characters and pickups.")
+		return
+	for node_name in ["BaseballBatPickup", "GunPickup"]:
+		var pickup := world_actors.get_node_or_null(node_name) as Node2D
+		if pickup == null:
+			_fail(root, "%s should be under WorldActors for y-sort." % node_name)
+			return
+		if pickup.z_index != player.z_index:
+			_fail(root, "%s should share the player z-index so y-sort can order them by ground position." % node_name)
+			return
+	var hands_sprite := player.get_node_or_null("HandsSprite") as CanvasItem
+	if hands_sprite == null:
+		_fail(root, "Player should have HandsSprite for layered character visuals.")
+		return
+	var gun_pickup := world_actors.get_node_or_null("GunPickup") as CanvasItem
+	if gun_pickup != null and player.z_index + hands_sprite.z_index > gun_pickup.z_index:
+		_fail(root, "Player HandsSprite should not rise above same-layer ground pickups.")
 		return
 	if obstacles.size() < EXPECTED_OBSTACLE_COUNT:
 		_fail(root, "Navigation obstacle test scene does not have enough obstacle bodies.")

@@ -1,21 +1,21 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene format=3 uid="uid://bobpmc8ol714w"]
 
-[ext_resource type="Script" path="res://scripts/projectiles/axe_projectile.gd" id="1_axe_projectile"]
+[ext_resource type="Script" uid="uid://c3vfaum0i42en" path="res://scripts/projectiles/axe_projectile.gd" id="1_axe_projectile"]
 [ext_resource type="SpriteFrames" path="res://resources/characters/enemies/axe_sprite_frames.tres" id="2_axe_frames"]
 [ext_resource type="PackedScene" path="res://scenes/items/axe_pickup.tscn" id="3_axe_pickup"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_axe_projectile"]
 size = Vector2(10, 10)
 
-[node name="AxeProjectile" type="Area2D"]
+[node name="AxeProjectile" type="Area2D" unique_id=1144309718]
 collision_layer = 0
 collision_mask = 9
 script = ExtResource("1_axe_projectile")
 pickup_scene = ExtResource("3_axe_pickup")
 
-[node name="Sprite" type="AnimatedSprite2D" parent="."]
+[node name="Sprite" type="AnimatedSprite2D" parent="." unique_id=798505228]
 sprite_frames = ExtResource("2_axe_frames")
 animation = &"thrown_side"
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=384206748]
 shape = SubResource("RectangleShape2D_axe_projectile")

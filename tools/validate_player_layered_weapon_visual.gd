@@ -44,17 +44,38 @@ func _run() -> void:
 	if hands_sprite.animation != body_sprite.animation or hands_sprite.frame != body_sprite.frame:
 		_fail(root, "HandsSprite should sync walk animation and frame.")
 		return
+	if hands_sprite.z_index <= body_sprite.z_index:
+		_fail(root, "HandsSprite should draw in front of the body for side-facing animations.")
+		return
+	if hands_sprite.z_index > 0 or body_sprite.z_index > 0:
+		_fail(root, "Player internal visual layers should not rise above the actor root sorting layer.")
+		return
+
+	player.call("play_walk", "up")
+	await process_frame
+	if hands_sprite.z_index >= body_sprite.z_index:
+		_fail(root, "HandsSprite should draw behind the body for up-facing animations.")
+		return
+	if hands_sprite.z_index > 0 or body_sprite.z_index > 0:
+		_fail(root, "Player internal visual layers should stay within the actor root sorting layer while facing up.")
+		return
 
 	player.call("attack", "attack_first", "down")
 	await process_frame
 	if hands_sprite.animation != body_sprite.animation or not hands_sprite.visible:
 		_fail(root, "HandsSprite should sync attack animation.")
 		return
+	if hands_sprite.z_index <= body_sprite.z_index:
+		_fail(root, "HandsSprite should draw in front of the body for down-facing attacks.")
+		return
+	if hands_sprite.z_index > 0 or body_sprite.z_index > 0:
+		_fail(root, "Player internal attack layers should not rise above the actor root sorting layer.")
+		return
 
 	player.call("clear_weapon_visual")
 	await process_frame
-	if hands_sprite.visible:
-		_fail(root, "clear_weapon_visual should hide HandsSprite.")
+	if not hands_sprite.visible or hands_sprite.sprite_frames != hands_frames:
+		_fail(root, "clear_weapon_visual should restore the unarmed HandsSprite visuals.")
 		return
 
 	player.call("equip_weapon_visual", hands_frames)

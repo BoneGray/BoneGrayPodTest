@@ -1,0 +1,31 @@
+[gd_resource type="Resource" script_class="WeaponData" format=3 uid="uid://chy8vu67s0sgp"]
+
+[ext_resource type="Script" uid="uid://c7bci1o77ogwu" path="res://scripts/equipment/weapon_data.gd" id="1_weapon_data"]
+[ext_resource type="Texture2D" uid="uid://ilcnhacmvujr" path="res://assets/equipment/weapons/gun/gun_world.png" id="3_icon"]
+[ext_resource type="SpriteFrames" uid="uid://7v5rgf6jv4w5" path="res://resources/equipment/weapons/gun/gun_sprite_frames.tres" id="4_frames"]
+[ext_resource type="Resource" uid="uid://bled2l7ij0pd8" path="res://resources/equipment/weapons/gun/gun_primary_attack.tres" id="5_primary"]
+
+[resource]
+script = ExtResource("1_weapon_data")
+weapon_id = "gun"
+display_name = "Gun"
+weapon_type = "firearm"
+world_texture = ExtResource("3_icon")
+icon_texture = ExtResource("3_icon")
+visual_sprite_frames = ExtResource("4_frames")
+animation_visual_offsets = {
+&"idle_down": Vector2(0, 4),
+"idle_side": Vector2(3, 2),
+"idle_side_left": Vector2(-3, 2),
+"idle_up": Vector2(0, -4),
+"walk_down": Vector2(0, 4),
+"walk_side": Vector2(3, 2),
+"walk_side_left": Vector2(-3, 2),
+"walk_up": Vector2(0, -4)
+}
+pickup_scene_path = "res://scenes/items/weapons/gun_pickup.tscn"
+primary_attack_profile = ExtResource("5_primary")
+attack_power = 12
+attack_cooldown = 0.35
+repeat_while_held = true
+hold_to_repeat_delay = 0.1

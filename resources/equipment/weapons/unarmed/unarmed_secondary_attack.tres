@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="AttackProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/equipment/attack_profile.gd" id="1_attack_profile"]
+
+[resource]
+script = ExtResource("1_attack_profile")
+profile_id = "unarmed_secondary"
+attack_type = "melee"
+animation_action = "attack_second"
+damage = 10
+cooldown = 0.35
+hit_frames = Array[int]([2])
+max_targets = 3

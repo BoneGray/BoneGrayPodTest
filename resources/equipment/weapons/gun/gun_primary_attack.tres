@@ -1,0 +1,34 @@
+[gd_resource type="Resource" script_class="AttackProfile" format=3 uid="uid://bled2l7ij0pd8"]
+
+[ext_resource type="Script" uid="uid://dntfyvnqos6k" path="res://scripts/equipment/attack_profile.gd" id="1_attack_profile"]
+[ext_resource type="PackedScene" path="res://scenes/projectiles/player_bullet_projectile.tscn" id="2_bullet_scene"]
+[ext_resource type="PackedScene" path="res://scenes/effects/weapons/gun_muzzle_flash.tscn" id="3_muzzle_flash"]
+[ext_resource type="PackedScene" path="res://scenes/effects/weapons/gun_bullet_casing.tscn" id="4_bullet_casing"]
+[ext_resource type="PackedScene" path="res://scenes/effects/projectiles/bullet_wall_impact.tscn" id="5_wall_impact"]
+
+[resource]
+script = ExtResource("1_attack_profile")
+profile_id = "gun_primary"
+attack_type = "projectile"
+damage = 12
+cooldown = 0.12
+input_mode = "hold_repeat"
+cancel_last_frames = 0
+projectile_scene = ExtResource("2_bullet_scene")
+projectile_speed = 220.0
+wall_impact_scene = ExtResource("5_wall_impact")
+wall_impact_pool_limit = 50
+muzzle_flash_scene = ExtResource("3_muzzle_flash")
+muzzle_flash_offset_down = Vector2(0, 12)
+muzzle_flash_offset_up = Vector2(0, -15)
+muzzle_flash_offset_side = Vector2(16, -1)
+muzzle_flash_offset_side_left = Vector2(-16, -1)
+casing_scene = ExtResource("4_bullet_casing")
+casing_offset_down = Vector2(4, 6)
+casing_offset_up = Vector2(4, -8)
+casing_offset_side = Vector2(6, 0)
+casing_offset_side_left = Vector2(-6, 0)
+casing_eject_speed = 52.0
+casing_speed_variance = 12.0
+casing_lifetime = 0.38
+casing_pool_limit = 40

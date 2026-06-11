@@ -1,11 +1,23 @@
 extends Area2D
 
+@export_group("Landing")
+## 斧子落地后生成的拾取物场景，通常是敌人自己的斧子拾取物。
 @export var pickup_scene: PackedScene
+
+@export_group("Target")
+## 可被投掷斧子命中的目标组名。
 @export var target_group := "player"
+
+@export_group("Defaults")
+## 默认飞行速度，单位为像素/秒。攻击配置可以覆盖该值。
 @export var default_speed := 120.0
+## 默认飞行持续时间，单位为秒。超过该时间后斧子会落地。
 @export var default_lifetime := 0.8
+## 默认伤害值。攻击配置可以覆盖该值。
 @export var default_damage := 8
+## 默认阻挡碰撞层掩码，用于判断墙体或障碍是否挡住投掷物。
 @export var default_blocked_by_mask := 1
+## 命中墙体时从碰撞点向后退的距离，避免拾取物卡进墙体。
 @export var wall_landing_backoff := 6.0
 
 @onready var sprite: AnimatedSprite2D = $Sprite

@@ -5,6 +5,8 @@
 [ext_resource type="SpriteFrames" uid="uid://bmjn301svtkye" path="res://resources/characters/player/player_no_hands_sprite_frames.tres" id="3_6eyoc"]
 [ext_resource type="SpriteFrames" uid="uid://dur3nrj50g5vl" path="res://resources/characters/player/player_hands_sprite_frames.tres" id="4_eojnx"]
 [ext_resource type="Script" uid="uid://bu867rg6booq6" path="res://scripts/combat/hurt_flash_feedback.gd" id="5_qgnko"]
+[ext_resource type="Resource" path="res://resources/equipment/weapons/unarmed/unarmed_primary_attack.tres" id="6_unarmed_primary"]
+[ext_resource type="Resource" path="res://resources/equipment/weapons/unarmed/unarmed_secondary_attack.tres" id="7_unarmed_secondary"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_7vyk4"]
 size = Vector2(8, 10)
@@ -2756,10 +2758,13 @@ _data = {
 }
 
 [node name="Player" type="CharacterBody2D" unique_id=1160340334 groups=["player"]]
+z_index = 1
 collision_layer = 2
 script = ExtResource("1_atpat")
 stats = ExtResource("2_kqtwu")
 target_group = "enemy"
+unarmed_primary_attack_profile = ExtResource("6_unarmed_primary")
+unarmed_secondary_attack_profile = ExtResource("7_unarmed_secondary")
 camera_follow_enabled = false
 
 [node name="Sprite" type="AnimatedSprite2D" parent="." unique_id=2078166478]

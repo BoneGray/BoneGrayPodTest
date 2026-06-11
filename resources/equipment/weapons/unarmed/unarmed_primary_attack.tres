@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="AttackProfile" format=3 uid="uid://dsbs0op3730e6"]
+
+[ext_resource type="Script" uid="uid://dntfyvnqos6k" path="res://scripts/equipment/attack_profile.gd" id="1_attack_profile"]
+
+[resource]
+script = ExtResource("1_attack_profile")
+profile_id = "unarmed_primary"
+damage = 5
+cooldown = 0.35
+input_mode = "tap_combo"
+cancel_last_frames = 1

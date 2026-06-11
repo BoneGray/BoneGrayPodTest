@@ -39,6 +39,36 @@ Weapon equipment controls combat output:
 - animation key
 - hit effect
 
+Player primary attack input is selected by `AttackProfile.input_mode`.
+
+Each weapon should choose one main input feel instead of mixing short press, tap combo, and hold repeat at the same time:
+
+- `single_press`: one press triggers one attack. This is suitable for handguns, slow tools, or weapons that should not combo.
+- `tap_combo`: repeated short presses can chain attacks through input buffering and recovery canceling. This is suitable for unarmed attacks, bats, knives, and other manual melee weapons.
+- `hold_repeat`: pressing once fires once, then holding repeats according to cooldown. This is suitable for automatic firearms.
+
+Current player weapon input modes:
+
+- Unarmed: `tap_combo`
+- Baseball bat: `tap_combo`
+- Automatic gun: `hold_repeat`
+
+Tap combo rules:
+
+- `input_buffer_time` controls how long a short press waits when the attack cannot start immediately.
+- `cancel_last_frames` controls how many final animation frames are treated as recovery frames that can be canceled by a buffered short press.
+- Recovery canceling should happen after the active hit frames, not during startup or hit confirmation.
+- Four-frame attacks should usually start with the last `1` cancel frame; longer attacks can test the last `2` frames.
+- Holding the attack key should not automatically repeat a `tap_combo` attack.
+
+Hold repeat rules:
+
+- `hold_to_repeat_delay` controls how long the player must hold before repeated attacks begin.
+- The repeated attack interval comes from the current attack `cooldown`.
+- Hold repeat should not use short-press input buffering or recovery canceling.
+- Hold repeat is a temporary held-input state. Releasing the attack key should clear repeat state, cancel repeat-only animation lock, and restore normal movement speed and turning.
+- Automatic firearms should usually set `cancel_last_frames = 0`.
+
 Tool equipment controls active utility behavior:
 
 - cooldown
