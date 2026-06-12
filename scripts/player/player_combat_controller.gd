@@ -14,6 +14,11 @@ const PHASE_ACTIVE := "active"
 const PHASE_RECOVERY := "recovery"
 const PHASE_FINISHED := "finished"
 
+const MOVEMENT_INHERIT := "inherit"
+const MOVEMENT_SLOW_LOCKED_DIRECTION := "slow_locked_direction"
+const MOVEMENT_SLOW_TURN_TO_INPUT := "slow_turn_to_input"
+const MOVEMENT_ROOTED := "rooted"
+
 var default_hit_frames := {
 	"attack_first": [2],
 	"attack_second": [2],
@@ -238,6 +243,17 @@ func get_attack_hit_frames(attack_profile: Resource, action_name: String) -> Arr
 	return default_hit_frames.get(action_name, [])
 
 
+func get_attack_phase(attack_profile: Resource, action_name: String, current_frame: int, frame_count: int) -> String:
+	var hit_frames := get_attack_hit_frames(attack_profile, action_name)
+	if current_frame in _get_phase_frames(attack_profile, "startup_frames", _derive_startup_frames(hit_frames)):
+		return PHASE_STARTUP
+	if current_frame in _get_phase_frames(attack_profile, "active_frames", hit_frames):
+		return PHASE_ACTIVE
+	if current_frame in _get_phase_frames(attack_profile, "recovery_frames", _derive_recovery_frames(hit_frames, frame_count)):
+		return PHASE_RECOVERY
+	return PHASE_NONE
+
+
 func get_attack_max_targets(attack_profile: Resource, action: String) -> int:
 	if attack_profile != null:
 		var profile_max_targets := int(attack_profile.get("max_targets"))
@@ -272,13 +288,19 @@ func get_attack_cancel_last_frames(attack_profile: Resource) -> int:
 	return maxi(int(attack_profile.get("cancel_last_frames")), 0)
 
 
-func get_attack_cooldown(attack_profile: Resource, equipped_weapon: Resource, fallback_cooldown: float) -> float:
-	var input_mode := get_attack_input_mode(attack_profile, equipped_weapon)
-	if input_mode != INPUT_HOLD_REPEAT and equipped_weapon != null:
-		var weapon_attack_cooldown := float(equipped_weapon.get("attack_cooldown"))
-		if weapon_attack_cooldown > 0.0:
-			return weapon_attack_cooldown
+func get_attack_movement_rule(attack_profile: Resource, equipped_weapon: Resource) -> String:
+	if attack_profile != null:
+		var movement_rule := String(attack_profile.get("movement_rule"))
+		if movement_rule in [MOVEMENT_SLOW_LOCKED_DIRECTION, MOVEMENT_SLOW_TURN_TO_INPUT, MOVEMENT_ROOTED]:
+			return movement_rule
 
+	var input_mode := get_attack_input_mode(attack_profile, equipped_weapon)
+	if input_mode == INPUT_TAP_COMBO:
+		return MOVEMENT_SLOW_TURN_TO_INPUT
+	return MOVEMENT_SLOW_LOCKED_DIRECTION
+
+
+func get_attack_cooldown(attack_profile: Resource, equipped_weapon: Resource, fallback_cooldown: float) -> float:
 	if attack_profile != null:
 		var profile_cooldown := float(attack_profile.get("cooldown"))
 		if profile_cooldown > 0.0:
@@ -313,6 +335,8 @@ func is_repeat_attack_enabled(attack_profile: Resource, equipped_weapon: Resourc
 		return true
 	if repeat_mode == "disabled":
 		return false
+	if get_attack_input_mode(attack_profile, equipped_weapon) == INPUT_HOLD_REPEAT:
+		return true
 	if equipped_weapon != null:
 		return bool(equipped_weapon.get("repeat_while_held"))
 	return unarmed_repeat_while_held
@@ -326,3 +350,31 @@ func get_hold_to_repeat_delay(attack_profile: Resource, equipped_weapon: Resourc
 	if equipped_weapon != null:
 		return maxf(float(equipped_weapon.get("hold_to_repeat_delay")), 0.0)
 	return maxf(fallback_delay, 0.0)
+
+
+func _get_phase_frames(attack_profile: Resource, property_name: String, fallback_frames: Array) -> Array:
+	if attack_profile != null:
+		var configured_frames := attack_profile.get(property_name) as Array
+		if configured_frames != null and not configured_frames.is_empty():
+			return configured_frames
+	return fallback_frames
+
+
+func _derive_startup_frames(hit_frames: Array) -> Array:
+	var startup_frames: Array[int] = []
+	if hit_frames.is_empty():
+		return startup_frames
+	var first_hit_frame := get_first_hit_frame(hit_frames)
+	for frame in first_hit_frame:
+		startup_frames.append(frame)
+	return startup_frames
+
+
+func _derive_recovery_frames(hit_frames: Array, frame_count: int) -> Array:
+	var recovery_frames: Array[int] = []
+	if hit_frames.is_empty():
+		return recovery_frames
+	var last_hit_frame := get_last_hit_frame(hit_frames)
+	for frame in range(last_hit_frame + 1, frame_count):
+		recovery_frames.append(frame)
+	return recovery_frames

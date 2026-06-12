@@ -89,8 +89,12 @@ func _run() -> void:
 	if hands_sprite.position != hands_base_position + gun_data.get("visual_offset_side") + _animation_visual_offset(gun_data, "walk_side"):
 		_fail(root, "Gun side visual should be offset downward to keep the player head visible.")
 		return
-	if hands_sprite.z_index <= player.get_node("Sprite").z_index:
-		_fail(root, "Gun side visual should render in front of the player body.")
+	var body_sprite := player.get_node("Sprite") as AnimatedSprite2D
+	if hands_sprite.z_index < body_sprite.z_index:
+		_fail(root, "Gun side visual should not render behind the player body.")
+		return
+	if hands_sprite.z_index == body_sprite.z_index and body_sprite.get_index() > hands_sprite.get_index():
+		_fail(root, "Gun side visual should be after the player body when sharing the same z-index.")
 		return
 
 	var original_animation_offsets = gun_data.get("animation_visual_offsets")

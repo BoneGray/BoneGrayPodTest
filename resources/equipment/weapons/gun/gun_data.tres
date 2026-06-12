@@ -25,7 +25,3 @@ animation_visual_offsets = {
 }
 pickup_scene_path = "res://scenes/items/weapons/gun_pickup.tscn"
 primary_attack_profile = ExtResource("5_primary")
-attack_power = 12
-attack_cooldown = 0.35
-repeat_while_held = true
-hold_to_repeat_delay = 0.1

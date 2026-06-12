@@ -9,3 +9,7 @@ damage = 10
 cooldown = 0.65
 input_mode = "tap_combo"
 cancel_last_frames = 1
+startup_frames = Array[int]([0, 1])
+active_frames = Array[int]([2])
+recovery_frames = Array[int]([3])
+movement_rule = "slow_turn_to_input"

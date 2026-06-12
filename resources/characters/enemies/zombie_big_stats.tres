@@ -1,6 +1,8 @@
-[gd_resource type="Resource" script_class="EnemyStats" format=3 uid="uid://bfsbwpa8sjumk"]
+[gd_resource type="Resource" script_class="EnemyStats" load_steps=4 format=3 uid="uid://bfsbwpa8sjumk"]
 
 [ext_resource type="Script" uid="uid://djibwqa6eumc2" path="res://scripts/enemies/enemy_stats.gd" id="1_enemy_stats"]
+[ext_resource type="Resource" path="res://resources/characters/enemies/attacks/zombie_big_heavy_stun_attack.tres" id="2_heavy_stun"]
+[ext_resource type="Resource" path="res://resources/characters/enemies/attacks/zombie_default_melee_attack.tres" id="3_default_melee"]
 
 [resource]
 script = ExtResource("1_enemy_stats")
@@ -8,11 +10,8 @@ display_name = "Zombie Big"
 move_speed = 42.0
 attack_actions = Array[String](["attack_first", "attack_second"])
 attack_profiles = {
-"attack_second": {
-"recovery": 0.45,
-"status_duration": 0.8,
-"status_effect": "stun",
-"type": "melee"
+"attack_first": ExtResource("3_default_melee"),
+"attack_second": ExtResource("2_heavy_stun")
 }
-}
+attack_selection_order = "special_first"
 knockback_resistance = 0.1

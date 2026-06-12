@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EnemyAttackProfile" format=3]
+
+[ext_resource type="Script" path="res://scripts/enemies/enemy_attack_profile.gd" id="1_enemy_attack_profile"]
+
+[resource]
+script = ExtResource("1_enemy_attack_profile")
+action_name = "attack_second"
+attack_type = "cross"
+min_range = 12.0
+max_range = 56.0
+selection_weight = 1.0
+repeat_weight_multiplier = 0.65
+target_stunned_weight_multiplier = 2.0
+special_cooldown = 2.0
+recovery = 0.25
+hit_detection = "body_motion"
+cross_distance = 18.0
+cross_duration = 0.45

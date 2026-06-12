@@ -69,6 +69,17 @@ Hold repeat rules:
 - Hold repeat is a temporary held-input state. Releasing the attack key should clear repeat state, cancel repeat-only animation lock, and restore normal movement speed and turning.
 - Automatic firearms should usually set `cancel_last_frames = 0`.
 
+Player weapon combat data should live on `AttackProfile` first:
+
+- `AttackProfile.damage` defines attack damage.
+- `AttackProfile.cooldown` defines attack cadence.
+- `AttackProfile.input_mode` defines whether the weapon is `single_press`, `tap_combo`, or `hold_repeat`.
+- `AttackProfile.repeat_mode` and `hold_to_repeat_delay` define hold-repeat behavior when needed.
+- `AttackProfile.startup_frames`, `active_frames`, and `recovery_frames` define the attack phase timeline. If they are empty, runtime may derive phases from `hit_frames` for migration compatibility.
+- `AttackProfile.movement_rule` defines movement during attack. Current rules are `slow_locked_direction`, `slow_turn_to_input`, and `rooted`; `inherit` keeps the old input-mode-based fallback.
+- `WeaponData.attack_power`, `attack_cooldown`, `repeat_while_held`, and `hold_to_repeat_delay` are migration fallback fields only. New weapons should leave them at defaults and configure the attack profile instead.
+- Fourth-step resourceization closeout is tracked in `docs/combat-data-resourceization-closeout.md`.
+
 Tool equipment controls active utility behavior:
 
 - cooldown
@@ -151,8 +162,21 @@ Current note:
 
 Current special attack decision:
 
+- The current enemy feel is treated as the `Normal` baseline: dangerous, readable enough, and close to the prototype feel that already plays well.
+- Enemy attack selection should be data-driven before adding Easy or Hard variants. The current baseline uses `attack_selection_order = "special_first"`, `default_attack_weight = 1.0`, `special_attack_weight_multiplier = 1.0`, and `melee_attack_weight_multiplier = 1.0`.
+- Enemy `attack_profiles` support both inline `Dictionary` profiles and `EnemyAttackProfile` resources. Runtime code converts both forms into the same dictionary shape before selection and execution.
+- Enemy attacks should prefer `.tres` resources once their rules are stable. Current resource-backed attacks include Big/Small default melee, Axe weapon melee, Axe no-weapon melee, Big heavy stun, Small cross, and Axe throw.
+- New enemy `attack_actions` should define an explicit `EnemyAttackProfile` resource by default. Inline `Dictionary` profiles are kept only as a migration fallback.
+- Existing Big / Small / Axe attack actions are resource-backed as of the fourth-step combat data resourceization closeout.
+- Individual attack profiles may use `selection_weight` to tune how often an available attack is selected. A weight of `0` disables selection without removing the profile.
+- Individual special attacks may use `special_cooldown` for independent cooldown. The enemy keeps runtime `last_used` data per action, so finishing the current animation does not clear special cooldown.
+- Attack profiles may use contextual multipliers such as `repeat_weight_multiplier` and `target_stunned_weight_multiplier`. These change priority only after the attack passes distance, line-of-sight, weapon, and cooldown checks; they must not bypass cooldown.
+- If a profile later defines `special_cooldown_min` and `special_cooldown_max`, the current implementation uses `special_cooldown_min` as the fixed cooldown first. Random cooldown ranges should be enabled only after we explicitly decide the enemy needs less mechanical timing.
+- Easy and Hard should adjust weights, range, cooldown, and selection order through data first. Do not rewrite enemy AI logic just to create difficulty tiers.
 - Normal enemy attacks use `type = "melee"` and keep the existing standing attack flow: choose direction, play animation, enable `AttackArea2D` during hit frames, then apply damage on overlap.
 - `Zombie Small` uses `attack_second` as `type = "cross"`.
+- `Zombie Small` lowers the weight of immediately repeated cross attacks, but raises the cross priority when the target is stunned. This keeps the attack from feeling spammy while still allowing Big + Small cooperation.
+- `Zombie Big` is a slow heavy controller. Its second attack has lower selection weight, independent cooldown, strong repeat suppression, and lower priority when the target is already stunned.
 - `Zombie Big` uses `attack_second` as a heavy melee hit that applies `status_effect = "stun"` for a short duration when it lands.
 - Melee enemies should prefer the attack slot matching their current relative direction to the player. They should only abandon that slot when they are stuck or not making progress, not merely because a fixed timer elapsed.
 - Melee attack startup and melee hit confirmation are separate checks: an enemy may start a melee attack after reaching its reserved attack slot and staying within commit range, even if root-to-target distance is slightly outside the base attack range; actual damage still depends on the attack window and hit shape.
@@ -162,6 +186,8 @@ Current special attack decision:
 - Cross attack should not continuously home toward the player after it starts. This keeps the attack readable and lets the player dodge.
 - After a cross attack, the enemy turns back toward the player so the final turn frames and gameplay direction agree.
 - `Zombie Axe` uses `attack_second` as `type = "projectile"`: it throws its axe, loses the weapon after the projectile spawns, then switches to no-axe animations and no-axe melee.
+- `Zombie Axe` is a mid-range pressure enemy. Its throw has medium selection weight, independent cooldown, repeat suppression, and a small priority boost when the target is stunned.
 - A no-axe enemy should prefer retrieving its own landed weapon unless the player is already close enough to justify a no-axe melee response.
 - Enemy thrown weapons are enemy-owned in the current slice; the player cannot pick them up yet.
+- Axe thrown weapon pickups are owner-bound. Only the Axe that threw the weapon may register and retrieve that pickup; other Axe enemies must ignore it. If the owner is deactivated or dies, its retrieval target is cleared.
 - Current prototype scope supports `melee`, `leap`, `cross`, and simple enemy-owned `projectile`; area, summon, or multi-phase attacks should be added as separate attack profile types later.

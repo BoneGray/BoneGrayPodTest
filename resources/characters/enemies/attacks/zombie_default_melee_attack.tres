@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="EnemyAttackProfile" format=3]
+
+[ext_resource type="Script" path="res://scripts/enemies/enemy_attack_profile.gd" id="1_enemy_attack_profile"]
+
+[resource]
+script = ExtResource("1_enemy_attack_profile")
+action_name = "attack_first"
+attack_type = "melee"
+selection_weight = 1.0

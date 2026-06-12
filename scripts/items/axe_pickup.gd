@@ -12,6 +12,10 @@ func configure(source_enemy: Node, direction_name: String) -> void:
 	_play_landed_animation()
 
 
+func is_owned_by(candidate: Node) -> bool:
+	return owner_enemy == candidate
+
+
 func _ready() -> void:
 	_play_landed_animation()
 

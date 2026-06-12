@@ -476,14 +476,17 @@ func _update_current_attack_phase(hit_frames: Array) -> void:
 	if _combat_controller.current_attack_action == "" or hit_frames.is_empty():
 		return
 
-	var first_hit_frame := _get_first_hit_frame(hit_frames)
-	var last_hit_frame := _get_last_hit_frame(hit_frames)
-	if sprite.frame < first_hit_frame:
-		_set_current_attack_phase(PCC.PHASE_STARTUP)
-	elif sprite.frame in hit_frames:
-		_set_current_attack_phase(PCC.PHASE_ACTIVE)
-	elif sprite.frame > last_hit_frame:
-		_set_current_attack_phase(PCC.PHASE_RECOVERY)
+	var frame_count := 0
+	if sprite.sprite_frames != null and sprite.sprite_frames.has_animation(sprite.animation):
+		frame_count = sprite.sprite_frames.get_frame_count(sprite.animation)
+	var phase := _combat_controller.get_attack_phase(
+		_get_current_attack_profile(),
+		_combat_controller.current_attack_action,
+		sprite.frame,
+		frame_count
+	)
+	if phase != PCC.PHASE_NONE:
+		_set_current_attack_phase(phase)
 
 
 func _on_animation_finished() -> void:
@@ -892,6 +895,9 @@ func _apply_locked_attack_movement() -> void:
 	if movement == Vector2.ZERO:
 		velocity = Vector2.ZERO
 		return
+	if _get_current_attack_movement_rule() == PCC.MOVEMENT_ROOTED:
+		velocity = Vector2.ZERO
+		return
 	if _can_turn_during_current_attack():
 		_turn_current_attack_to_direction(_direction_from_vector(movement))
 	velocity = movement.normalized() * get_move_speed() * attacking_move_speed_multiplier
@@ -907,9 +913,11 @@ func _turn_current_attack_to_movement_input() -> void:
 
 
 func _can_turn_during_current_attack() -> bool:
-	var attack_profile := _get_current_attack_profile()
-	var input_mode := _get_attack_input_mode(attack_profile)
-	return input_mode == PCC.INPUT_TAP_COMBO
+	return _get_current_attack_movement_rule() == PCC.MOVEMENT_SLOW_TURN_TO_INPUT
+
+
+func _get_current_attack_movement_rule() -> String:
+	return _combat_controller.get_attack_movement_rule(_get_current_attack_profile(), equipped_weapon)
 
 
 func _turn_current_attack_to_direction(next_direction: String) -> void:
@@ -1352,7 +1360,7 @@ func _apply_equipment_visual_layer(animation_name: String) -> void:
 		sprite.z_index = _body_visual_base_z_index
 		hands_sprite.z_index = _equipment_visual_base_z_index - 1
 	else:
-		sprite.z_index = _body_visual_base_z_index - 1
+		sprite.z_index = _body_visual_base_z_index
 		hands_sprite.z_index = _equipment_visual_base_z_index
 
 

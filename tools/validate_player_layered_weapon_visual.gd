@@ -44,15 +44,24 @@ func _run() -> void:
 	if hands_sprite.animation != body_sprite.animation or hands_sprite.frame != body_sprite.frame:
 		_fail(root, "HandsSprite should sync walk animation and frame.")
 		return
-	if hands_sprite.z_index <= body_sprite.z_index:
-		_fail(root, "HandsSprite should draw in front of the body for side-facing animations.")
+	if body_sprite.z_index != 0:
+		_fail(root, "Player body should stay on the actor root sorting layer for side-facing animations.")
+		return
+	if hands_sprite.z_index < body_sprite.z_index:
+		_fail(root, "HandsSprite should not draw behind the body for side-facing animations.")
 		return
 	if hands_sprite.z_index > 0 or body_sprite.z_index > 0:
 		_fail(root, "Player internal visual layers should not rise above the actor root sorting layer.")
 		return
+	if body_sprite.get_index() > hands_sprite.get_index():
+		_fail(root, "HandsSprite should be after Sprite in the player scene tree when sharing the same z-index.")
+		return
 
 	player.call("play_walk", "up")
 	await process_frame
+	if body_sprite.z_index != 0:
+		_fail(root, "Player body should stay on the actor root sorting layer while facing up.")
+		return
 	if hands_sprite.z_index >= body_sprite.z_index:
 		_fail(root, "HandsSprite should draw behind the body for up-facing animations.")
 		return
@@ -65,8 +74,11 @@ func _run() -> void:
 	if hands_sprite.animation != body_sprite.animation or not hands_sprite.visible:
 		_fail(root, "HandsSprite should sync attack animation.")
 		return
-	if hands_sprite.z_index <= body_sprite.z_index:
-		_fail(root, "HandsSprite should draw in front of the body for down-facing attacks.")
+	if body_sprite.z_index != 0:
+		_fail(root, "Player body should stay on the actor root sorting layer for down-facing attacks.")
+		return
+	if hands_sprite.z_index < body_sprite.z_index:
+		_fail(root, "HandsSprite should not draw behind the body for down-facing attacks.")
 		return
 	if hands_sprite.z_index > 0 or body_sprite.z_index > 0:
 		_fail(root, "Player internal attack layers should not rise above the actor root sorting layer.")

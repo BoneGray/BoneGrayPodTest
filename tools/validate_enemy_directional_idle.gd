@@ -27,7 +27,6 @@ func _run() -> void:
 	player.set("keyboard_control_enabled", false)
 	enemy.global_position = Vector2(100, 100)
 	enemy.set("auto_acquire_target", false)
-	enemy.call_deferred("set_target", player)
 
 	var checks := {
 		Vector2(0, 8): &"idle_down",
@@ -38,8 +37,8 @@ func _run() -> void:
 
 	for offset in checks:
 		player.global_position = enemy.global_position + offset
-		enemy.call("set_target", player)
-		await physics_frame
+		enemy.set("current_direction", enemy.call("_direction_from_vector", offset))
+		enemy.call("_play_idle")
 		var sprite := enemy.get_node("Sprite") as AnimatedSprite2D
 		var expected_animation: StringName = checks[offset]
 		if sprite.animation != expected_animation:

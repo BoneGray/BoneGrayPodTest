@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="EnemyAttackProfile" format=3]
+
+[ext_resource type="Script" path="res://scripts/enemies/enemy_attack_profile.gd" id="1_enemy_attack_profile"]
+
+[resource]
+script = ExtResource("1_enemy_attack_profile")
+action_name = "attack_second"
+attack_type = "projectile"
+requires_weapon = true
+min_range = 36.0
+max_range = 126.0
+blocked_by_mask = 1
+selection_weight = 0.75
+repeat_weight_multiplier = 0.5
+target_stunned_weight_multiplier = 1.2
+special_cooldown = 4.0
+damage = 10
+recovery = 0.35
+drop_weapon = true
+projectile_scene = "res://scenes/projectiles/axe_projectile.tscn"
+projectile_speed = 145.0
+projectile_lifetime = 0.85
+projectile_spawn_time = 0.45
+projectile_spawn_offset = 10.0

@@ -1,6 +1,8 @@
-[gd_resource type="Resource" script_class="EnemyStats" format=3 uid="uid://drsdbfoaa5nul"]
+[gd_resource type="Resource" script_class="EnemyStats" load_steps=4 format=3 uid="uid://drsdbfoaa5nul"]
 
 [ext_resource type="Script" uid="uid://djibwqa6eumc2" path="res://scripts/enemies/enemy_stats.gd" id="1_enemy_stats"]
+[ext_resource type="Resource" path="res://resources/characters/enemies/attacks/zombie_small_cross_attack.tres" id="2_cross_attack"]
+[ext_resource type="Resource" path="res://resources/characters/enemies/attacks/zombie_default_melee_attack.tres" id="3_default_melee"]
 
 [resource]
 script = ExtResource("1_enemy_stats")
@@ -10,18 +12,12 @@ move_speed = 56.0
 attack_power = 5
 attack_actions = Array[String](["attack_first", "attack_second"])
 attack_profiles = {
-"attack_second": {
-"cross_distance": 18.0,
-"cross_duration": 0.45,
-"hit_detection": "body_motion",
-"max_range": 56.0,
-"min_range": 12.0,
-"recovery": 0.25,
-"type": "cross"
-}
+"attack_first": ExtResource("3_default_melee"),
+"attack_second": ExtResource("2_cross_attack")
 }
 detect_range = 66.0
 lose_target_range = 84.0
 attack_range = 16.0
 attack_cooldown = 0.9
+attack_selection_order = "special_first"
 separation_radius = 14.0

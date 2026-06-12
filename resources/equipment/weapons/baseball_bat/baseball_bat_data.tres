@@ -18,6 +18,3 @@ visual_sprite_frames = ExtResource("4_frames")
 pickup_scene_path = "res://scenes/items/weapons/baseball_bat_pickup.tscn"
 primary_attack_profile = ExtResource("5_primary")
 secondary_attack_profile = ExtResource("6_secondary")
-attack_power = 16
-attack_cooldown = 0.45
-repeat_while_held = true

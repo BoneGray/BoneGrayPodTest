@@ -2758,7 +2758,7 @@ _data = {
 }
 
 [node name="Player" type="CharacterBody2D" unique_id=1160340334 groups=["player"]]
-z_index = 1
+z_index = 0
 collision_layer = 2
 script = ExtResource("1_atpat")
 stats = ExtResource("2_kqtwu")

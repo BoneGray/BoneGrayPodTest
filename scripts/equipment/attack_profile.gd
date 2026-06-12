@@ -2,7 +2,7 @@ extends Resource
 class_name AttackProfile
 
 @export_group("Identity")
-## 攻击配置的稳定 ID，用于武器数据、日志和后续调试识别。
+## 攻击配置的稳定 ID，用于武器数据、日志、存档和调试识别。
 @export var profile_id := ""
 ## 攻击类型。当前玩家武器支持 melee 和 projectile。
 @export_enum("melee", "projectile") var attack_type := "melee"
@@ -24,6 +24,18 @@ class_name AttackProfile
 @export var input_buffer_time := 0.18
 ## 攻击动画最后几帧允许短按取消后摇并接下一次攻击。0 表示不允许短按取消。
 @export var cancel_last_frames := 2
+
+@export_group("Phases")
+## 攻击前摇帧。未配置时会根据 hit_frames 自动推导为首个命中帧之前的帧。
+@export var startup_frames: Array[int] = []
+## 攻击有效帧。未配置时使用 hit_frames；可用于区分有效阶段和实际命中帧。
+@export var active_frames: Array[int] = []
+## 攻击后摇帧。未配置时会根据 hit_frames 自动推导为最后命中帧之后的帧。
+@export var recovery_frames: Array[int] = []
+
+@export_group("Movement")
+## 攻击过程中的移动规则。inherit 使用 input_mode 推导；slow_locked_direction 允许减速移动但不转向；slow_turn_to_input 允许减速移动并按输入转向；rooted 表示攻击中不能移动。
+@export_enum("inherit", "slow_locked_direction", "slow_turn_to_input", "rooted") var movement_rule := "inherit"
 
 @export_group("Melee")
 ## 近战攻击在动画第几帧启用命中判定。
@@ -84,7 +96,7 @@ class_name AttackProfile
 @export var casing_eject_speed := 55.0
 ## 弹壳弹出速度的随机浮动范围，单位为像素/秒。
 @export var casing_speed_variance := 16.0
-## 弹壳落地前的运动时间，单位为秒。
+## 弹壳消失前的飞行动画时间，单位为秒。
 @export var casing_lifetime := 0.45
 ## 同时存在的弹壳上限。小于 0 时使用 EffectManager 默认值。
 @export var casing_pool_limit := -1

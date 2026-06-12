@@ -19,17 +19,20 @@ func _run() -> void:
 	var root := Node2D.new()
 	var enemy := enemy_scene.instantiate() as BaseEnemy
 	var player := player_scene.instantiate() as CharacterBody2D
+	enemy.auto_acquire_target = false
+	enemy.use_navigation_agent = false
+	enemy.use_separation = false
+	enemy.attack_slot_arrive_distance = 6.0
+	player.set("keyboard_control_enabled", false)
 	get_root().add_child(root)
 	root.add_child(enemy)
 	root.add_child(player)
 
 	await process_frame
 
-	enemy.use_navigation_agent = false
-	enemy.use_separation = false
-	enemy.attack_slot_arrive_distance = 6.0
 	player.global_position = Vector2.ZERO
 	enemy.global_position = Vector2(0, -15)
+	enemy.attack_cooldown_remaining = 0.0
 	enemy.set_target(player)
 
 	var to_target := player.global_position - enemy.global_position

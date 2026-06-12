@@ -20,6 +20,8 @@ func _run() -> void:
 	var root := Node2D.new()
 	var enemy := enemy_scene.instantiate() as BaseEnemy
 	var player := player_scene.instantiate() as CharacterBody2D
+	enemy.auto_acquire_target = false
+	player.add_to_group("player")
 	get_root().add_child(root)
 	root.add_child(enemy)
 	root.add_child(player)

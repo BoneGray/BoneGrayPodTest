@@ -28,6 +28,7 @@ var blocked_by_mask := 1
 var elapsed := 0.0
 var attack_profile: Resource
 var _hit_targets: Array[Node] = []
+var _blocked_on_launch := false
 
 
 func _ready() -> void:
@@ -56,9 +57,14 @@ func launch(source: Node, launch_direction: Vector2, attack_profile: Resource, o
 	if override_target_group != "":
 		target_group = override_target_group
 	rotation = direction.angle()
+	_blocked_on_launch = _spawn_would_hit_wall()
+	set_meta("blocked_on_launch", _blocked_on_launch)
 
 
 func _physics_process(delta: float) -> void:
+	if _blocked_on_launch:
+		return
+
 	elapsed += delta
 	var next_position := global_position + direction * speed * delta
 	if _move_would_hit_wall(global_position, next_position):
@@ -94,6 +100,7 @@ func _move_would_hit_wall(from: Vector2, to: Vector2) -> bool:
 
 	var query := PhysicsRayQueryParameters2D.create(from, to)
 	query.collision_mask = blocked_by_mask
+	query.hit_from_inside = true
 	query.exclude = [get_rid()]
 	if owner_node != null and is_instance_valid(owner_node) and owner_node is CollisionObject2D:
 		query.exclude.append((owner_node as CollisionObject2D).get_rid())
@@ -107,6 +114,28 @@ func _move_would_hit_wall(from: Vector2, to: Vector2) -> bool:
 	global_position = hit_position - direction * wall_backoff
 	queue_free()
 	return true
+
+
+func _spawn_would_hit_wall() -> bool:
+	set_meta("launch_wall_probe_checked", true)
+	if owner_node == null or not is_instance_valid(owner_node):
+		set_meta("launch_wall_probe_reason", "missing_owner")
+		return false
+
+	var source := owner_node as Node2D
+	if source == null:
+		set_meta("launch_wall_probe_reason", "owner_not_node2d")
+		return false
+
+	var from := source.global_position
+	set_meta("launch_wall_probe_from", from)
+	set_meta("launch_wall_probe_to", global_position)
+	if from.distance_squared_to(global_position) <= 0.01:
+		set_meta("launch_wall_probe_reason", "zero_length")
+		return false
+	var hit_wall := _move_would_hit_wall(from, global_position)
+	set_meta("launch_wall_probe_reason", "hit" if hit_wall else "clear")
+	return hit_wall
 
 
 func _spawn_wall_impact(hit_position: Vector2, hit_normal: Vector2) -> void:

@@ -100,11 +100,17 @@ func _run() -> void:
 	if hands_sprite.sprite_frames != weapon_frames:
 		_fail(root, "Player HandsSprite should use baseball bat SpriteFrames after pickup.")
 		return
-	if player.call("get_attack_power") != int(weapon_data.get("attack_power")):
-		_fail(root, "Equipped baseball bat should override attack power.")
+	var primary_attack := weapon_data.get("primary_attack_profile") as Resource
+	if primary_attack == null:
+		_fail(root, "Baseball bat should define a primary AttackProfile.")
 		return
-	if player.call("get_attack_cooldown") != float(weapon_data.get("attack_cooldown")):
-		_fail(root, "Equipped baseball bat should override attack cooldown.")
+	player.call("attack", "attack_first", "down")
+	await process_frame
+	if player.call("get_attack_power") != int(primary_attack.get("damage")):
+		_fail(root, "Equipped baseball bat should use primary AttackProfile damage.")
+		return
+	if absf(float(player.call("get_attack_cooldown", primary_attack)) - float(primary_attack.get("cooldown"))) > 0.001:
+		_fail(root, "Equipped baseball bat should use primary AttackProfile cooldown.")
 		return
 
 	print("Baseball bat pickup is valid.")

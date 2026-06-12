@@ -1,6 +1,9 @@
-[gd_resource type="Resource" script_class="EnemyStats" format=3 uid="uid://bkaknn0ok3w2o"]
+[gd_resource type="Resource" script_class="EnemyStats" load_steps=5 format=3 uid="uid://bkaknn0ok3w2o"]
 
 [ext_resource type="Script" uid="uid://djibwqa6eumc2" path="res://scripts/enemies/enemy_stats.gd" id="1_enemy_stats"]
+[ext_resource type="Resource" path="res://resources/characters/enemies/attacks/zombie_axe_throw_attack.tres" id="2_throw_attack"]
+[ext_resource type="Resource" path="res://resources/characters/enemies/attacks/zombie_axe_melee_attack.tres" id="3_axe_melee"]
+[ext_resource type="Resource" path="res://resources/characters/enemies/attacks/zombie_axe_no_weapon_melee_attack.tres" id="4_no_weapon_melee"]
 
 [resource]
 script = ExtResource("1_enemy_stats")
@@ -10,31 +13,15 @@ move_speed = 48.0
 attack_power = 7
 attack_actions = Array[String](["attack_first", "attack_second", "attack_first_no_axe"])
 attack_profiles = {
-"attack_first": {
-"requires_weapon": true,
-"type": "melee"
-},
-"attack_first_no_axe": {
-"damage": 4,
-"requires_no_weapon": true,
-"type": "melee"
-},
-"attack_second": {
-"blocked_by_mask": 1,
-"damage": 10,
-"drop_weapon": true,
-"max_range": 126.0,
-"min_range": 36.0,
-"projectile_lifetime": 0.85,
-"projectile_scene": "res://scenes/projectiles/axe_projectile.tscn",
-"projectile_spawn_offset": 10.0,
-"projectile_spawn_time": 0.45,
-"projectile_speed": 145.0,
-"recovery": 0.35,
-"requires_weapon": true,
-"type": "projectile"
-}
+"attack_first": ExtResource("3_axe_melee"),
+"attack_first_no_axe": ExtResource("4_no_weapon_melee"),
+"attack_second": ExtResource("2_throw_attack")
 }
 lose_target_range = 128.0
 attack_cooldown = 1.1
+attack_selection_order = "special_first"
 separation_radius = 15.0
+weapon_pickup_range = 8.0
+no_weapon_close_attack_range = 26.0
+weapon_retrieval_timeout = 1.5
+weapon_retrieval_progress_epsilon = 0.5

@@ -1,6 +1,11 @@
 extends CharacterBody2D
 class_name BaseEnemy
 
+const ESM = preload("res://scripts/enemies/enemy_state_machine.gd")
+const ECC = preload("res://scripts/enemies/enemy_combat_controller.gd")
+const EMC = preload("res://scripts/enemies/enemy_movement_controller.gd")
+const EWC = preload("res://scripts/enemies/enemy_weapon_controller.gd")
+
 signal died(enemy: Node)
 signal health_changed(current: int, maximum: int)
 signal attack_hit(target: Node)
@@ -135,6 +140,10 @@ var _default_hitbox_monitoring := true
 var _default_hitbox_monitorable := true
 var _default_attack_area_position := Vector2.ZERO
 var _attack_slot_manager: Node
+var _state_machine := ESM.new()
+var _combat_controller := ECC.new()
+var _movement_controller := EMC.new()
+var _weapon_controller := EWC.new()
 
 var attack_hit_frames := {
 	"attack_first": [4],
@@ -166,9 +175,10 @@ func _physics_process(delta: float) -> void:
 
 	var previous_position := global_position
 	attack_cooldown_remaining = maxf(attack_cooldown_remaining - delta, 0.0)
-	path_refresh_remaining = maxf(path_refresh_remaining - delta, 0.0)
+	_advance_combat_strategy_runtime(delta)
+	_advance_movement_runtime(delta)
 	if state == State.ATTACK:
-		attack_elapsed += delta
+		_advance_combat_runtime(delta)
 	if target != null and not _is_valid_target(target):
 		_clear_target()
 	if target == null and auto_acquire_target:
@@ -213,15 +223,123 @@ func configure_stats(new_stats: Resource) -> void:
 	health_changed.emit(health, get_max_health())
 
 
+func _change_state(next_state: int) -> bool:
+	if not _state_machine.change_to(next_state):
+		return false
+	state = _state_machine.current_state
+	return true
+
+
+func _enter_idle_state(reset_idle_timer := false) -> void:
+	_change_state(State.IDLE)
+	velocity = Vector2.ZERO
+	sprite.position = Vector2.ZERO
+	if reset_idle_timer:
+		idle_patrol_remaining = _random_idle_duration()
+	_play_idle()
+
+
+func _enter_chase_state(face_target := true, play_idle := false) -> void:
+	_change_state(State.CHASE)
+	velocity = Vector2.ZERO
+	if face_target and target != null:
+		current_direction = _direction_from_vector(target.global_position - global_position)
+	if play_idle:
+		sprite.position = Vector2.ZERO
+		_play_idle()
+
+
+func _enter_patrol_state() -> void:
+	_change_state(State.PATROL)
+	patrol_direction = _random_patrol_direction()
+	idle_patrol_remaining = _random_patrol_duration()
+
+
+func _enter_dead_state() -> void:
+	_release_attack_slot()
+	_change_state(State.DEAD)
+	velocity = Vector2.ZERO
+
+
+func _sync_combat_runtime_from_controller() -> void:
+	attack_elapsed = _combat_controller.attack_elapsed
+	current_attack_action = _combat_controller.current_attack_action
+	current_attack_type = _combat_controller.current_attack_type
+	current_attack_profile = _combat_controller.current_attack_profile
+	projectile_attack_spawned = _combat_controller.projectile_attack_spawned
+	_hit_targets = _combat_controller.hit_targets
+
+
+func _reset_combat_runtime(clear_strategy_runtime := false) -> void:
+	_combat_controller.reset(clear_strategy_runtime)
+	_sync_combat_runtime_from_controller()
+
+
+func _begin_combat_runtime(action_name: String, profile: Dictionary) -> void:
+	_combat_controller.begin_attack(action_name, profile)
+	_sync_combat_runtime_from_controller()
+
+
+func _advance_combat_strategy_runtime(delta: float) -> void:
+	_combat_controller.advance_runtime(delta)
+
+
+func _advance_combat_runtime(delta: float) -> void:
+	_combat_controller.advance(delta)
+	_sync_combat_runtime_from_controller()
+
+
+func _mark_projectile_attack_spawned() -> void:
+	_combat_controller.mark_projectile_spawned()
+	_sync_combat_runtime_from_controller()
+
+
+func _has_hit_target(hit_target: Node) -> bool:
+	return _combat_controller.has_hit_target(hit_target)
+
+
+func _register_hit_target(hit_target: Node) -> void:
+	_combat_controller.register_hit_target(hit_target)
+	_sync_combat_runtime_from_controller()
+
+
+func _sync_movement_runtime_from_controller() -> void:
+	path_refresh_remaining = _movement_controller.path_refresh_remaining
+	navigation_destination = _movement_controller.navigation_destination
+
+
+func _reset_movement_path() -> void:
+	_movement_controller.reset_path()
+	_sync_movement_runtime_from_controller()
+
+
+func _advance_movement_runtime(delta: float) -> void:
+	_movement_controller.advance_path_refresh(delta)
+	_sync_movement_runtime_from_controller()
+
+
+func _sync_weapon_runtime_from_controller() -> void:
+	has_weapon = _weapon_controller.has_weapon
+	weapon_pickup = _weapon_controller.weapon_pickup
+	weapon_retrieval_elapsed = _weapon_controller.weapon_retrieval_elapsed
+	weapon_retrieval_last_distance = _weapon_controller.weapon_retrieval_last_distance
+
+
+func _reset_weapon_runtime(armed := true) -> void:
+	_weapon_controller.reset(armed)
+	_sync_weapon_runtime_from_controller()
+
+
 func activate(spawn_position: Vector2, new_stats: Resource = null) -> void:
 	_release_attack_slot()
 	if new_stats != null:
 		stats = new_stats
 
+	_state_machine.reset(start_state)
 	global_position = spawn_position
 	show()
 	add_to_group("enemy")
-	state = start_state
+	_change_state(start_state)
 	health = get_max_health()
 	target = null
 	velocity = Vector2.ZERO
@@ -236,20 +354,14 @@ func activate(spawn_position: Vector2, new_stats: Resource = null) -> void:
 	attack_slot_stuck_elapsed = 0.0
 	attack_slot_last_distance = INF
 	attack_slot_excluded_directions.clear()
-	attack_elapsed = 0.0
-	current_attack_action = ""
-	current_attack_type = "melee"
-	current_attack_profile = {}
-	has_weapon = true
+	_reset_combat_runtime(true)
 	_clear_weapon_pickup()
-	projectile_attack_spawned = false
+	_reset_weapon_runtime(true)
 	leap_start_position = spawn_position
 	leap_end_position = spawn_position
 	leap_duration = 0.0
 	attack_cooldown_remaining = 0.0
-	path_refresh_remaining = 0.0
-	navigation_destination = Vector2.INF
-	_hit_targets.clear()
+	_reset_movement_path()
 	collision_layer = _default_collision_layer
 	collision_mask = _default_collision_mask
 	hitbox_area.monitoring = _default_hitbox_monitoring
@@ -268,28 +380,20 @@ func activate(spawn_position: Vector2, new_stats: Resource = null) -> void:
 
 
 func deactivate() -> void:
-	_release_attack_slot()
+	_enter_dead_state()
 	target = null
-	velocity = Vector2.ZERO
-	state = State.DEAD
 	attack_cooldown_remaining = 0.0
-	path_refresh_remaining = 0.0
-	navigation_destination = Vector2.INF
+	_reset_movement_path()
 	has_attack_slot = false
 	attack_slot_elapsed = 0.0
 	attack_slot_stuck_elapsed = 0.0
 	attack_slot_last_distance = INF
 	attack_slot_excluded_directions.clear()
-	attack_elapsed = 0.0
-	current_attack_action = ""
-	current_attack_type = "melee"
-	current_attack_profile = {}
+	_reset_combat_runtime(true)
 	_clear_weapon_pickup()
-	projectile_attack_spawned = false
 	leap_start_position = global_position
 	leap_end_position = global_position
 	leap_duration = 0.0
-	_hit_targets.clear()
 	remove_from_group("enemy")
 	set_physics_process(false)
 	collision_layer = 0
@@ -314,9 +418,8 @@ func set_target(new_target: Node2D) -> void:
 		attack_slot_excluded_directions.clear()
 	target = new_target
 	if state != State.DEAD and state != State.ATTACK:
-		state = State.CHASE if target != null else State.IDLE
-		path_refresh_remaining = 0.0
-		navigation_destination = Vector2.INF
+		_change_state(State.CHASE if target != null else State.IDLE)
+		_reset_movement_path()
 		idle_patrol_remaining = _random_idle_duration()
 
 
@@ -338,8 +441,7 @@ func die() -> void:
 	if state == State.DEAD:
 		return
 
-	_release_attack_slot()
-	state = State.DEAD
+	_enter_dead_state()
 	_disable_combat_logic()
 	_play_death()
 	died.emit(self)
@@ -365,18 +467,14 @@ func begin_attack(animation_name := "attack_first") -> void:
 		return
 
 	animation_name = _directional_animation_name(animation_name)
-	current_attack_action = _attack_action_from_animation(animation_name)
-	if not _can_use_attack_action(current_attack_action):
+	var attack_action := _attack_action_from_animation(animation_name)
+	if not _can_use_attack_action(attack_action):
 		current_attack_action = ""
 		return
 
-	state = State.ATTACK
+	_change_state(State.ATTACK)
 	attack_cooldown_remaining = get_attack_cooldown()
-	attack_elapsed = 0.0
-	_hit_targets.clear()
-	current_attack_profile = get_attack_profile(current_attack_action)
-	current_attack_type = String(current_attack_profile.get("type", "melee"))
-	projectile_attack_spawned = false
+	_begin_combat_runtime(attack_action, get_attack_profile(attack_action))
 	_prepare_attack_motion()
 	_sync_attack_area_to_direction()
 	if animation_player != null and animation_player.has_animation(animation_name):
@@ -396,12 +494,7 @@ func _on_sprite_frame_changed() -> void:
 	if state != State.ATTACK or _uses_body_motion_hit_detection():
 		return
 
-	var action_name := _attack_action_from_animation(sprite.animation)
-	if not attack_hit_frames.has(action_name):
-		return
-
-	var hit_frames: Array = attack_hit_frames[action_name]
-	if sprite.frame in hit_frames:
+	if _combat_controller.is_animation_hit_frame(sprite.animation, sprite.frame, attack_hit_frames):
 		_sync_attack_area_to_direction()
 		_apply_attack_hits()
 
@@ -413,33 +506,19 @@ func _on_sprite_animation_finished() -> void:
 
 func _finish_attack() -> void:
 	_set_attack_active(false)
-	_hit_targets.clear()
-	projectile_attack_spawned = false
-	var recovery := float(current_attack_profile.get("recovery", 0.0))
+	var recovery := _combat_controller.get_recovery()
 	if recovery > 0.0:
 		attack_cooldown_remaining = maxf(attack_cooldown_remaining, recovery)
-	attack_elapsed = 0.0
-	current_attack_action = ""
-	current_attack_type = "melee"
-	current_attack_profile = {}
-	projectile_attack_spawned = false
+	_reset_combat_runtime()
 	leap_duration = 0.0
 	if state == State.DEAD:
 		return
 
 	if target == null:
-		state = State.IDLE
-		velocity = Vector2.ZERO
-		sprite.position = Vector2.ZERO
-		_play_idle()
+		_enter_idle_state()
 		return
 
-	state = State.CHASE
-	velocity = Vector2.ZERO
-	if target != null:
-		current_direction = _direction_from_vector(target.global_position - global_position)
-	sprite.position = Vector2.ZERO
-	_play_idle()
+	_enter_chase_state(true, true)
 
 
 func _clear_target() -> void:
@@ -447,49 +526,26 @@ func _clear_target() -> void:
 	target = null
 	attack_slot_excluded_directions.clear()
 	velocity = Vector2.ZERO
-	path_refresh_remaining = 0.0
-	navigation_destination = Vector2.INF
-	current_attack_action = ""
-	current_attack_type = "melee"
-	current_attack_profile = {}
-	projectile_attack_spawned = false
+	_reset_movement_path()
+	_reset_combat_runtime()
 	leap_duration = 0.0
-	attack_elapsed = 0.0
-	_hit_targets.clear()
 	_set_attack_active(false)
 	if animation_player != null:
 		animation_player.stop()
 	if state != State.DEAD:
-		sprite.position = Vector2.ZERO
-		_start_idle()
+		_enter_idle_state(true)
 
 
 func _is_attack_animation(animation_name: StringName) -> bool:
-	var name := String(animation_name)
-	return name.begins_with("attack_")
+	return _combat_controller.is_attack_animation(animation_name)
 
 
 func _attack_action_from_animation(animation_name: StringName) -> String:
-	var name := String(animation_name)
-	var parts := name.split("_", false)
-	if parts.size() >= 3 and parts[0] == "attack":
-		var supplement_start := 2
-		if parts.size() >= 4 and parts[1] == "side" and parts[2] == "left":
-			supplement_start = 3
-		if supplement_start < parts.size():
-			return "attack_%s" % "_".join(parts.slice(supplement_start))
-	return name
+	return _combat_controller.attack_action_from_animation(animation_name)
 
 
 func _is_current_attack_hit_window() -> bool:
-	if not attack_hit_windows.has(current_attack_action):
-		return false
-
-	var windows: Array = attack_hit_windows[current_attack_action]
-	for window in windows:
-		if attack_elapsed >= window.x and attack_elapsed <= window.y:
-			return true
-	return false
+	return _combat_controller.is_in_hit_window(attack_hit_windows)
 
 
 func _is_attack_animation_playing() -> bool:
@@ -501,15 +557,12 @@ func _is_attack_animation_playing() -> bool:
 
 
 func _select_attack_action() -> String:
-	var available_actions: Array[String] = []
-	for action in get_attack_actions():
-		var animation_name := _directional_animation_name(action)
-		if _has_animation(animation_name) and _can_use_attack_action(action):
-			available_actions.append(action)
+	return _combat_controller.select_attack_action(get_attack_actions(), _is_attack_action_ready, "attack_first")
 
-	if available_actions.is_empty():
-		return "attack_first"
-	return available_actions.pick_random()
+
+func _is_attack_action_ready(action: String) -> bool:
+	var animation_name := _directional_animation_name(action)
+	return _has_animation(animation_name) and _can_use_attack_action(action)
 
 
 func _has_animation(animation_name: String) -> bool:
@@ -560,7 +613,31 @@ func get_attack_profile(action_name: String) -> Dictionary:
 			var profile: Variant = profiles[action_name]
 			if profile is Dictionary:
 				return profile
+			if profile is Resource:
+				return _attack_profile_resource_to_dictionary(profile)
 	return {"type": "melee"}
+
+
+func _attack_profile_resource_to_dictionary(profile: Resource) -> Dictionary:
+	if profile == null:
+		return {"type": "melee"}
+	if profile.has_method("to_dictionary"):
+		var profile_data: Variant = profile.to_dictionary()
+		if profile_data is Dictionary:
+			return profile_data
+	var fallback := {}
+	var attack_type: Variant = profile.get("attack_type")
+	if attack_type != null:
+		fallback["type"] = String(attack_type)
+	var damage_value: Variant = profile.get("damage")
+	if damage_value != null and int(damage_value) > 0:
+		fallback["damage"] = int(damage_value)
+	var cooldown_value: Variant = profile.get("cooldown")
+	if cooldown_value != null and float(cooldown_value) > 0.0:
+		fallback["special_cooldown"] = float(cooldown_value)
+	if fallback.is_empty():
+		fallback["type"] = "melee"
+	return fallback
 
 
 func get_detect_range() -> float:
@@ -587,33 +664,47 @@ func get_separation_strength() -> float:
 	return stats.separation_strength if stats != null else 0.35
 
 
+func get_weapon_pickup_range() -> float:
+	return float(stats.get("weapon_pickup_range")) if stats != null else weapon_pickup_range
+
+
+func get_no_weapon_close_attack_range() -> float:
+	return float(stats.get("no_weapon_close_attack_range")) if stats != null else no_weapon_close_attack_range
+
+
+func get_weapon_retrieval_timeout() -> float:
+	return float(stats.get("weapon_retrieval_timeout")) if stats != null else weapon_retrieval_timeout
+
+
+func get_weapon_retrieval_progress_epsilon() -> float:
+	return float(stats.get("weapon_retrieval_progress_epsilon")) if stats != null else weapon_retrieval_progress_epsilon
+
+
 func _update_combat_movement(_delta: float) -> void:
 	if target == null:
-		state = State.IDLE
-		velocity = Vector2.ZERO
-		_play_idle()
+		_enter_idle_state()
 		return
 
 	var to_target := target.global_position - global_position
 	if to_target.length() > get_lose_target_range():
 		set_target(null)
-		velocity = Vector2.ZERO
-		_play_idle()
+		_enter_idle_state()
 		return
 
 	if _should_retrieve_weapon(to_target):
 		_update_weapon_retrieval(_delta)
 		return
 
-	var special_attack := _select_available_special_attack()
-	if special_attack != "":
-		_release_attack_slot()
-		attack_slot_excluded_directions.clear()
-		current_direction = _direction_from_vector(to_target)
-		_sync_attack_area_to_direction()
-		velocity = Vector2.ZERO
-		begin_attack(special_attack)
-		return
+	if _should_try_special_attack_before_melee():
+		var special_attack := _select_available_special_attack()
+		if special_attack != "":
+			_release_attack_slot()
+			attack_slot_excluded_directions.clear()
+			current_direction = _direction_from_vector(to_target)
+			_sync_attack_area_to_direction()
+			velocity = Vector2.ZERO
+			begin_attack(special_attack)
+			return
 
 	if _should_use_attack_slot(to_target):
 		_update_attack_slot(to_target, _delta)
@@ -629,9 +720,7 @@ func _update_combat_movement(_delta: float) -> void:
 		var to_slot := attack_slot_position - global_position
 		if _should_give_up_attack_slot(to_slot):
 			_exclude_current_attack_slot()
-			state = State.CHASE
-			velocity = Vector2.ZERO
-			_play_idle()
+			_enter_chase_state(false, true)
 			return
 
 		if to_slot.length() <= attack_slot_arrive_distance:
@@ -644,7 +733,18 @@ func _update_combat_movement(_delta: float) -> void:
 		_play_walk(slot_direction)
 		return
 
-	state = State.CHASE
+	if not _should_try_special_attack_before_melee():
+		var special_attack := _select_available_special_attack()
+		if special_attack != "":
+			_release_attack_slot()
+			attack_slot_excluded_directions.clear()
+			current_direction = _direction_from_vector(to_target)
+			_sync_attack_area_to_direction()
+			velocity = Vector2.ZERO
+			begin_attack(special_attack)
+			return
+
+	_change_state(State.CHASE)
 	_release_attack_slot()
 	attack_slot_excluded_directions.clear()
 	var direction := _get_path_direction(target.global_position, to_target)
@@ -656,6 +756,36 @@ func _update_combat_movement(_delta: float) -> void:
 	velocity = direction * get_move_speed()
 	current_direction = _direction_from_vector(direction)
 	_play_walk(direction)
+
+
+func _should_try_special_attack_before_melee() -> bool:
+	return get_attack_selection_order() == "special_first"
+
+
+func get_attack_selection_order() -> String:
+	if stats != null:
+		var configured_order: Variant = stats.get("attack_selection_order")
+		if configured_order is String and configured_order != "":
+			return configured_order
+	return "special_first"
+
+
+func get_default_attack_weight() -> float:
+	if stats != null:
+		return maxf(float(stats.get("default_attack_weight")), 0.0)
+	return 1.0
+
+
+func get_special_attack_weight_multiplier() -> float:
+	if stats != null:
+		return maxf(float(stats.get("special_attack_weight_multiplier")), 0.0)
+	return 1.0
+
+
+func get_melee_attack_weight_multiplier() -> float:
+	if stats != null:
+		return maxf(float(stats.get("melee_attack_weight_multiplier")), 0.0)
+	return 1.0
 
 
 func _should_use_attack_slot(to_target: Vector2) -> bool:
@@ -672,11 +802,14 @@ func _should_use_attack_slot(to_target: Vector2) -> bool:
 
 func _update_attack_slot(to_target: Vector2, delta: float) -> void:
 	var was_approaching := state == State.APPROACH_ATTACK_SLOT
-	state = State.APPROACH_ATTACK_SLOT
-	if not was_approaching or not has_attack_slot:
+	var preferred_direction := _direction_from_vector(to_target)
+	var should_reselect_slot := has_attack_slot and _is_opposite_direction(preferred_direction, attack_slot_direction)
+	_change_state(State.APPROACH_ATTACK_SLOT)
+	if not was_approaching or not has_attack_slot or should_reselect_slot:
 		if attack_slot_excluded_directions.size() >= ATTACK_SLOT_DIRECTIONS.size():
 			attack_slot_excluded_directions.clear()
-		var preferred_direction := _direction_from_vector(to_target)
+		if should_reselect_slot:
+			_release_attack_slot()
 		var claimed_direction := _claim_attack_slot(preferred_direction)
 		has_attack_slot = claimed_direction != ""
 		attack_slot_direction = claimed_direction if has_attack_slot else preferred_direction
@@ -712,8 +845,7 @@ func _exclude_current_attack_slot() -> void:
 	if has_attack_slot and not attack_slot_direction in attack_slot_excluded_directions:
 		attack_slot_excluded_directions.append(attack_slot_direction)
 	_release_attack_slot()
-	navigation_destination = Vector2.INF
-	path_refresh_remaining = 0.0
+	_reset_movement_path()
 
 
 func _should_give_up_attack_slot(to_slot: Vector2) -> bool:
@@ -774,6 +906,12 @@ func _direction_to_vector(direction: String) -> Vector2:
 	return Vector2.DOWN
 
 
+func _is_opposite_direction(first_direction: String, second_direction: String) -> bool:
+	if first_direction == second_direction:
+		return false
+	return _direction_to_vector(first_direction).dot(_direction_to_vector(second_direction)) < -0.5
+
+
 func _acquire_target() -> void:
 	if state == State.DEAD:
 		return
@@ -825,51 +963,25 @@ func _collect_group_nodes(node: Node, results: Array[Node]) -> void:
 
 
 func _get_path_direction(destination: Vector2, fallback_vector: Vector2) -> Vector2:
-	if navigation_agent == null or not use_navigation_agent:
-		return fallback_vector.normalized()
-
-	if path_refresh_remaining == 0.0 or navigation_destination.distance_to(destination) > 1.0:
-		navigation_destination = destination
-		navigation_agent.target_position = destination
-		path_refresh_remaining = path_refresh_interval
-
-	if navigation_agent.is_navigation_finished():
-		return fallback_vector.normalized()
-
-	var next_position := navigation_agent.get_next_path_position()
-	var to_next_position := next_position - global_position
-	if to_next_position == Vector2.ZERO:
-		return fallback_vector.normalized()
-	return to_next_position.normalized()
+	var direction: Vector2 = _movement_controller.get_path_direction(
+		navigation_agent,
+		use_navigation_agent,
+		destination,
+		fallback_vector,
+		global_position,
+		path_refresh_interval
+	)
+	_sync_movement_runtime_from_controller()
+	return direction
 
 
 func _get_separation_direction() -> Vector2:
-	var separation := Vector2.ZERO
-	var radius := get_separation_radius()
-	if radius <= 0.0:
-		return separation
-
-	for node in get_tree().get_nodes_in_group("enemy"):
-		var other := node as Node2D
-		if other == null or other == self:
-			continue
-		if other.has_method("is_alive") and not other.is_alive():
-			continue
-		var offset := global_position - other.global_position
-		var distance := offset.length()
-		if distance <= 0.0 or distance >= radius:
-			continue
-		var weight := 1.0 - distance / radius
-		separation += offset.normalized() * weight
-
-	return separation.normalized() if separation != Vector2.ZERO else Vector2.ZERO
+	return _movement_controller.get_separation_direction(get_tree().get_nodes_in_group("enemy"), self, get_separation_radius())
 
 
 func _update_idle_patrol(delta: float) -> void:
 	if not idle_patrol_enabled:
-		state = State.IDLE
-		velocity = Vector2.ZERO
-		_play_idle()
+		_enter_idle_state()
 		return
 
 	idle_patrol_remaining = maxf(idle_patrol_remaining - delta, 0.0)
@@ -883,24 +995,17 @@ func _update_idle_patrol(delta: float) -> void:
 		_play_walk(patrol_direction)
 		return
 
-	state = State.IDLE
-	velocity = Vector2.ZERO
-	_play_idle()
+	_enter_idle_state()
 	if idle_patrol_remaining == 0.0:
 		_start_patrol()
 
 
 func _start_idle() -> void:
-	state = State.IDLE
-	velocity = Vector2.ZERO
-	idle_patrol_remaining = _random_idle_duration()
-	_play_idle()
+	_enter_idle_state(true)
 
 
 func _start_patrol() -> void:
-	state = State.PATROL
-	patrol_direction = _random_patrol_direction()
-	idle_patrol_remaining = _random_patrol_duration()
+	_enter_patrol_state()
 
 
 func _random_idle_duration() -> float:
@@ -928,6 +1033,8 @@ func _can_use_attack_action(action_name: String) -> bool:
 	var profile := get_attack_profile(action_name)
 	if not _is_attack_profile_available_for_weapon_state(profile):
 		return false
+	if not _is_independent_special_cooldown_ready(action_name, profile):
+		return false
 
 	var attack_type := String(profile.get("type", "melee"))
 	var distance := global_position.distance_to(target.global_position)
@@ -945,53 +1052,45 @@ func _can_use_attack_action(action_name: String) -> bool:
 
 
 func _select_available_special_attack() -> String:
-	var available_actions: Array[String] = []
-	for action in get_attack_actions():
-		var profile := get_attack_profile(action)
-		if String(profile.get("type", "melee")) == "melee":
-			continue
-		if not _is_attack_profile_available_for_weapon_state(profile):
-			continue
-		var animation_name := _directional_animation_name(action)
-		if _has_animation(animation_name) and _can_use_attack_action(action):
-			available_actions.append(action)
-	if available_actions.is_empty():
-		return ""
-	return available_actions.pick_random()
+	return _combat_controller.select_available_attack_by_type(
+		get_attack_actions(),
+		get_attack_profile,
+		_is_attack_profile_available_for_weapon_state,
+		_is_attack_action_ready,
+		false,
+		get_default_attack_weight(),
+		get_special_attack_weight_multiplier(),
+		target
+	)
 
 
 func _select_available_melee_attack() -> String:
-	var available_actions: Array[String] = []
-	for action in get_attack_actions():
-		var profile := get_attack_profile(action)
-		if String(profile.get("type", "melee")) != "melee":
-			continue
-		if not _is_attack_profile_available_for_weapon_state(profile):
-			continue
-		var animation_name := _directional_animation_name(action)
-		if _has_animation(animation_name) and _can_use_attack_action(action):
-			available_actions.append(action)
-	if available_actions.is_empty():
-		return ""
-	return available_actions.pick_random()
+	return _combat_controller.select_available_attack_by_type(
+		get_attack_actions(),
+		get_attack_profile,
+		_is_attack_profile_available_for_weapon_state,
+		_is_attack_action_ready,
+		true,
+		get_default_attack_weight(),
+		get_melee_attack_weight_multiplier(),
+		target
+	)
 
 
 func _is_attack_profile_available_for_weapon_state(profile: Dictionary) -> bool:
-	if bool(profile.get("requires_weapon", false)) and not has_weapon:
-		return false
-	if bool(profile.get("requires_no_weapon", false)) and has_weapon:
-		return false
-	return true
+	return _combat_controller.is_profile_available_for_weapon_state(profile, has_weapon)
+
+
+func _is_independent_special_cooldown_ready(action_name: String, profile: Dictionary) -> bool:
+	return _combat_controller.is_independent_special_cooldown_ready(action_name, profile)
 
 
 func _should_retrieve_weapon(to_target: Vector2) -> bool:
-	if has_weapon or not _has_valid_weapon_pickup():
-		return false
-	return to_target.length() > no_weapon_close_attack_range
+	return _weapon_controller.should_retrieve_weapon(to_target.length(), get_no_weapon_close_attack_range())
 
 
 func _should_retrieve_weapon_without_target() -> bool:
-	return not has_weapon and _has_valid_weapon_pickup()
+	return _weapon_controller.should_retrieve_without_target()
 
 
 func _update_weapon_retrieval(delta: float = 0.0) -> void:
@@ -1006,11 +1105,11 @@ func _update_weapon_retrieval(delta: float = 0.0) -> void:
 		_recover_lost_weapon()
 		return
 
-	if to_weapon.length() <= weapon_pickup_range:
+	if to_weapon.length() <= get_weapon_pickup_range():
 		_pickup_weapon()
 		return
 
-	state = State.CHASE
+	_change_state(State.CHASE)
 	var direction := _get_path_direction(weapon_pickup.global_position, to_weapon)
 	velocity = direction * get_move_speed()
 	current_direction = _direction_from_vector(direction)
@@ -1018,27 +1117,21 @@ func _update_weapon_retrieval(delta: float = 0.0) -> void:
 
 
 func _update_weapon_retrieval_progress(distance: float, delta: float) -> void:
-	if weapon_retrieval_last_distance == INF or distance < weapon_retrieval_last_distance - weapon_retrieval_progress_epsilon:
-		weapon_retrieval_elapsed = 0.0
-		weapon_retrieval_last_distance = distance
-		return
-
-	weapon_retrieval_elapsed += delta
+	_weapon_controller.update_retrieval_progress(distance, delta, get_weapon_retrieval_progress_epsilon())
+	_sync_weapon_runtime_from_controller()
 
 
 func _is_weapon_retrieval_stuck() -> bool:
-	return weapon_retrieval_timeout > 0.0 and weapon_retrieval_elapsed >= weapon_retrieval_timeout
+	return _weapon_controller.is_retrieval_stuck(get_weapon_retrieval_timeout())
 
 
 func _has_valid_weapon_pickup() -> bool:
-	return weapon_pickup != null and is_instance_valid(weapon_pickup) and weapon_pickup.is_inside_tree()
+	return _weapon_controller.has_valid_pickup()
 
 
 func register_weapon_pickup(pickup: Node2D) -> void:
-	weapon_pickup = pickup
-	has_weapon = false
-	weapon_retrieval_elapsed = 0.0
-	weapon_retrieval_last_distance = INF
+	_weapon_controller.register_pickup(pickup, self)
+	_sync_weapon_runtime_from_controller()
 
 
 func _pickup_weapon() -> void:
@@ -1051,28 +1144,23 @@ func _pickup_weapon() -> void:
 	elif sprite.sprite_frames != null and sprite.sprite_frames.has_animation(pickup_animation):
 		sprite.play(pickup_animation)
 
-	weapon_pickup.queue_free()
-	weapon_pickup = null
-	has_weapon = true
-	weapon_retrieval_elapsed = 0.0
-	weapon_retrieval_last_distance = INF
+	var picked_weapon := _weapon_controller.collect_pickup()
+	_sync_weapon_runtime_from_controller()
+	if picked_weapon != null and is_instance_valid(picked_weapon):
+		picked_weapon.queue_free()
 	velocity = Vector2.ZERO
 	_play_idle()
 
 
 func _recover_lost_weapon() -> void:
 	_clear_weapon_pickup()
-	has_weapon = true
 	velocity = Vector2.ZERO
 	_play_idle()
 
 
 func _clear_weapon_pickup() -> void:
-	if _has_valid_weapon_pickup():
-		weapon_pickup.queue_free()
-	weapon_pickup = null
-	weapon_retrieval_elapsed = 0.0
-	weapon_retrieval_last_distance = INF
+	_weapon_controller.clear_pickup(true, true)
+	_sync_weapon_runtime_from_controller()
 
 
 func _is_ready_for_melee_attack_slot() -> bool:
@@ -1128,14 +1216,10 @@ func _update_attack_motion(_delta: float) -> void:
 
 
 func _try_spawn_projectile_attack() -> void:
-	if current_attack_type != "projectile" or projectile_attack_spawned:
+	if not _combat_controller.should_spawn_projectile():
 		return
 
-	var spawn_time := float(current_attack_profile.get("projectile_spawn_time", 0.35))
-	if attack_elapsed < spawn_time:
-		return
-
-	projectile_attack_spawned = true
+	_mark_projectile_attack_spawned()
 	if not _has_projectile_line_of_sight(current_attack_profile):
 		return
 
@@ -1164,7 +1248,8 @@ func _try_spawn_projectile_attack() -> void:
 		projectile.launch(self, direction, current_direction, current_attack_profile)
 
 	if bool(current_attack_profile.get("drop_weapon", false)):
-		has_weapon = false
+		_weapon_controller.mark_unarmed()
+		_sync_weapon_runtime_from_controller()
 
 
 func _projectile_direction() -> Vector2:
@@ -1219,7 +1304,7 @@ func _vector_from_direction(direction: String) -> Vector2:
 
 
 func _uses_body_motion_hit_detection() -> bool:
-	return String(current_attack_profile.get("hit_detection", "")) == "body_motion"
+	return _combat_controller.uses_body_motion_hit_detection()
 
 
 func _apply_body_motion_attack_hits(previous_position: Vector2) -> void:
@@ -1230,11 +1315,7 @@ func _apply_body_motion_attack_hits(previous_position: Vector2) -> void:
 
 
 func _is_attack_motion_active() -> bool:
-	if not current_attack_type in ["leap", "cross"]:
-		return false
-	if leap_duration <= 0.0:
-		return false
-	return attack_elapsed <= leap_duration
+	return _combat_controller.is_attack_motion_active(leap_duration)
 
 
 func _is_target_in_body_motion_area(target_node: Node2D, previous_position: Vector2) -> bool:
@@ -1403,9 +1484,7 @@ func _cache_lifecycle_defaults() -> void:
 func _disable_combat_logic() -> void:
 	velocity = Vector2.ZERO
 	target = null
-	_hit_targets.clear()
-	current_attack_type = "melee"
-	current_attack_profile = {}
+	_reset_combat_runtime()
 	leap_start_position = global_position
 	leap_end_position = global_position
 	leap_duration = 0.0
@@ -1438,11 +1517,11 @@ func _apply_active_attack_hits() -> void:
 
 func _try_hit_target(candidate: Node) -> void:
 	var hit_target := _resolve_hit_target(candidate)
-	if hit_target == null or hit_target in _hit_targets:
+	if hit_target == null or _has_hit_target(hit_target):
 		return
 
 	var attack_profile := _get_active_attack_profile()
-	_hit_targets.append(hit_target)
+	_register_hit_target(hit_target)
 	if hit_target.has_method("take_damage"):
 		hit_target.take_damage(_get_attack_damage(attack_profile))
 	_apply_attack_status_effect(hit_target, attack_profile)
@@ -1450,29 +1529,15 @@ func _try_hit_target(candidate: Node) -> void:
 
 
 func _get_attack_damage(attack_profile: Dictionary) -> int:
-	if attack_profile.has("damage"):
-		return int(attack_profile["damage"])
-	return get_attack_power()
+	return _combat_controller.get_attack_damage(attack_profile, get_attack_power())
 
 
 func _get_active_attack_profile() -> Dictionary:
-	if not current_attack_profile.is_empty():
-		return current_attack_profile
-	if current_attack_action != "":
-		return get_attack_profile(current_attack_action)
-	return {}
+	return _combat_controller.get_active_profile(get_attack_profile)
 
 
 func _apply_attack_status_effect(hit_target: Node, attack_profile: Dictionary) -> void:
-	var status_effect := String(attack_profile.get("status_effect", ""))
-	if status_effect == "" or not hit_target.has_method("apply_status_effect"):
-		return
-
-	var duration := float(attack_profile.get("status_duration", 0.0))
-	if duration <= 0.0:
-		return
-
-	hit_target.apply_status_effect(status_effect, duration, self)
+	_combat_controller.apply_attack_status_effect(hit_target, attack_profile, self)
 
 
 func _resolve_hit_target(candidate: Node) -> Node:
@@ -1552,6 +1617,8 @@ func _play_death() -> void:
 	var animation_names := _get_death_animation_candidates()
 	if not animation_names.is_empty():
 		var animation_name: StringName = animation_names.pick_random()
+		sprite.animation = animation_name
+		sprite.frame = 0
 		if animation_player != null and animation_player.has_animation(animation_name):
 			animation_player.play(animation_name)
 		else:

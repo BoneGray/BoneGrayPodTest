@@ -25,6 +25,16 @@ class_name EnemyStats
 ## 攻击冷却时间，单位为秒。
 @export var attack_cooldown := 1.2
 
+@export_group("Attack Strategy")
+## 攻击选择顺序。special_first 保留当前 Normal 体感：特殊攻击满足条件时优先尝试，然后再进入近战攻击槽。
+@export_enum("special_first", "melee_first") var attack_selection_order := "special_first"
+## 未在 attack_profiles 中写 selection_weight 时使用的默认权重。当前 Normal 使用 1，保持同类攻击等概率随机。
+@export var default_attack_weight := 1.0
+## 特殊攻击的整体权重倍率。当前 Normal 使用 1，后续 Easy/Hard 可在不改代码的情况下调整特殊攻击倾向。
+@export var special_attack_weight_multiplier := 1.0
+## 近战攻击的整体权重倍率。当前 Normal 使用 1，后续可用来让普通攻击更稳定或更频繁。
+@export var melee_attack_weight_multiplier := 1.0
+
 @export_group("Detection")
 ## 发现玩家的距离，单位为像素。
 @export var detect_range := 96.0
@@ -38,3 +48,12 @@ class_name EnemyStats
 @export var separation_radius := 16.0
 ## 敌人相互排开的力度。值越大，拥挤时分散越明显。
 @export var separation_strength := 0.35
+@export_group("Weapon Retrieval")
+## 找回自身武器的拾取距离，单位为像素。主要服务会投掷/丢失武器的敌人。
+@export var weapon_pickup_range := 8.0
+## 没有武器时，如果目标进入该范围，敌人优先近身攻击而不是继续找回武器。
+@export var no_weapon_close_attack_range := 24.0
+## 找回武器的卡住超时时间，单位为秒。超时后敌人恢复武器状态，避免永久卡住。
+@export var weapon_retrieval_timeout := 1.5
+## 判断找回武器是否有移动进展的最小距离，单位为像素。
+@export var weapon_retrieval_progress_epsilon := 0.5

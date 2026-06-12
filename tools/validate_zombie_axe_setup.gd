@@ -45,6 +45,9 @@ func _initialize() -> void:
 	root.add_child(player)
 	root.add_child(enemy)
 	await process_frame
+	_assert(is_equal_approx(enemy.get_weapon_pickup_range(), 8.0), "Zombie Axe reads weapon pickup range from stats.")
+	_assert(is_equal_approx(enemy.get_no_weapon_close_attack_range(), 26.0), "Zombie Axe reads no-weapon close attack range from stats.")
+	_assert(is_equal_approx(enemy.get_weapon_retrieval_timeout(), 1.5), "Zombie Axe reads weapon retrieval timeout from stats.")
 	enemy.set_target(player)
 
 	enemy.begin_attack("attack_second")

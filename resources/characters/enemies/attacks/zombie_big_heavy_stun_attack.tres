@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="EnemyAttackProfile" format=3]
+
+[ext_resource type="Script" path="res://scripts/enemies/enemy_attack_profile.gd" id="1_enemy_attack_profile"]
+
+[resource]
+script = ExtResource("1_enemy_attack_profile")
+action_name = "attack_second"
+attack_type = "melee"
+selection_weight = 0.55
+repeat_weight_multiplier = 0.4
+target_stunned_weight_multiplier = 0.6
+special_cooldown = 3.0
+recovery = 0.45
+status_effect = "stun"
+status_duration = 0.8
