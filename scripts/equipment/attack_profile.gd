@@ -50,6 +50,10 @@ class_name AttackProfile
 @export var projectile_speed := 180.0
 ## 弹丸最长存在时间，单位为秒。
 @export var projectile_lifetime := 0.8
+## 每次开火生成的弹丸数量。大于 1 时可用于散弹枪、扇形弹幕等武器。
+@export var projectile_count := 1
+## 多弹丸在基础方向上的总散布角度，单位为度。0 表示不散布。
+@export var projectile_spread_degrees := 0.0
 ## 弹丸会被哪些碰撞层阻挡，通常为地图墙体或障碍层。
 @export var projectile_blocked_by_mask := 1
 ## 弹丸命中墙体后从碰撞点回退的距离，避免视觉上嵌入墙体。

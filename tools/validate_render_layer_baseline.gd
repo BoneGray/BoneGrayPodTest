@@ -12,11 +12,9 @@ const CHARACTER_SCENE_PATHS := [
 const PICKUP_SCENE_PATHS := [
 	"res://scenes/items/weapons/baseball_bat_pickup.tscn",
 	"res://scenes/items/weapons/gun_pickup.tscn",
+	"res://scenes/items/weapons/pistol_pickup.tscn",
+	"res://scenes/items/weapons/shotgun_pickup.tscn",
 	"res://scenes/items/axe_pickup.tscn",
-]
-const LEGACY_SCENE_PATHS := [
-	"res://scenes/combat_test_scene.tscn",
-	"res://scenes/myScene.tscn",
 ]
 
 
@@ -26,8 +24,6 @@ func _initialize() -> void:
 
 func _run() -> void:
 	if not _validate_reusable_actor_scenes():
-		return
-	if not _validate_legacy_scene_audit():
 		return
 
 	var scene := load(SCENE_PATH) as PackedScene
@@ -66,12 +62,21 @@ func _run() -> void:
 		_fail(root, "Floor should live under TerrainLayer and should not participate in WorldActors YSort.")
 		return
 
-	for node_name in ["Player", "EnemyZombieAxe", "NavEnemy1", "NavBig1", "BaseballBatPickup", "GunPickup"]:
+	for node_name in ["Player", "EnemyZombieAxe", "NavEnemy1", "NavBig1", "BaseballBatPickup", "GunPickup", "PistolPickup", "ShotgunPickup"]:
 		var actor := world_actors.get_node_or_null(node_name) as Node2D
 		if actor == null:
 			_fail(root, "%s should live under WorldActors." % node_name)
 			return
 		if actor.z_index != RenderLayers.WORLD_Y_SORT_Z:
+			_fail(root, "%s should keep the WorldActors baseline z-index." % node_name)
+			return
+
+	for node_name in ["OuterObstacle1Body", "OuterObstacle2Body", "OuterObstacle3Body", "OuterObstacle4Body", "InnerObstacle1Body", "InnerObstacle2Body", "InnerObstacle3Body"]:
+		var obstacle := world_actors.get_node_or_null(node_name) as StaticBody2D
+		if obstacle == null:
+			_fail(root, "%s should live under WorldActors so obstacle visuals use the same y-sort rule as characters." % node_name)
+			return
+		if obstacle.z_index != RenderLayers.WORLD_Y_SORT_Z:
 			_fail(root, "%s should keep the WorldActors baseline z-index." % node_name)
 			return
 
@@ -156,26 +161,6 @@ func _validate_reusable_actor_scenes() -> bool:
 			quit(1)
 			return false
 		pickup.queue_free()
-
-	return true
-
-
-func _validate_legacy_scene_audit() -> bool:
-	for scene_path in LEGACY_SCENE_PATHS:
-		var scene := load(scene_path) as PackedScene
-		if scene == null:
-			push_error("Could not load legacy scene for render-layer audit: %s" % scene_path)
-			quit(1)
-			return false
-
-		var root := scene.instantiate() as Node
-		if root == null:
-			push_error("%s should instantiate for render-layer audit." % scene_path)
-			quit(1)
-			return false
-		if root.get_node_or_null("TerrainLayer") == null or root.get_node_or_null("WorldActors") == null:
-			print("Render layer migration pending for %s." % scene_path)
-		root.queue_free()
 
 	return true
 

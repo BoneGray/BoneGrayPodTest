@@ -3,6 +3,7 @@ extends CharacterBody2D
 const PSM = preload("res://scripts/player/player_state_machine.gd")
 const PIM = preload("res://scripts/player/player_input_map.gd")
 const PCC = preload("res://scripts/player/player_combat_controller.gd")
+const PFC = preload("res://scripts/player/firearm_controller.gd")
 
 signal attack_hit(target: Node)
 signal health_changed(current: int, maximum: int)
@@ -89,6 +90,7 @@ var _ignored_restarted_attack_animation := ""
 var _player_state_machine := PSM.new()
 var _input_map := PIM.new()
 var _combat_controller := PCC.new()
+var _firearm_controller := PFC.new()
 var equipped_weapon: Resource
 
 var attack_hit_frames := {
@@ -310,7 +312,8 @@ func _play_idle_animation_immediate(direction := current_direction) -> void:
 
 func play_walk(direction := current_direction) -> void:
 	current_direction = direction
-	_clear_attack_runtime_state()
+	if not _should_preserve_hold_repeat_input(_get_attack_profile("attack_first")):
+		_clear_attack_runtime_state()
 	_change_player_state(PSM.MOVE)
 	_play_animation_if_changed("walk_%s" % current_direction)
 
@@ -498,8 +501,8 @@ func _on_animation_finished() -> void:
 		if action_name.begins_with("attack_"):
 			var finished_attack_profile := _get_current_attack_profile()
 			_set_current_attack_phase(PCC.PHASE_FINISHED)
-			_clear_attack_runtime_state()
-			_clear_tap_combo_cooldown_after_animation(finished_attack_profile)
+			_clear_attack_runtime_state_after_animation(finished_attack_profile)
+			_clear_attack_cooldown_after_animation(finished_attack_profile)
 		else:
 			_set_attack_active(false)
 			_change_player_state(PSM.IDLE)
@@ -515,8 +518,8 @@ func _on_animation_player_finished(animation_name: StringName) -> void:
 		if action_name.begins_with("attack_"):
 			var finished_attack_profile := _get_current_attack_profile()
 			_set_current_attack_phase(PCC.PHASE_FINISHED)
-			_clear_attack_runtime_state()
-			_clear_tap_combo_cooldown_after_animation(finished_attack_profile)
+			_clear_attack_runtime_state_after_animation(finished_attack_profile)
+			_clear_attack_cooldown_after_animation(finished_attack_profile)
 		else:
 			_set_attack_active(false)
 			_change_player_state(PSM.IDLE)
@@ -568,8 +571,40 @@ func _clear_attack_runtime_state() -> void:
 	_set_attack_active(false)
 
 
-func _clear_tap_combo_cooldown_after_animation(attack_profile: Resource) -> void:
-	if _get_attack_input_mode(attack_profile) == PCC.INPUT_TAP_COMBO:
+func _clear_attack_runtime_state_after_animation(attack_profile: Resource) -> void:
+	var should_preserve_hold := _should_preserve_hold_repeat_input(attack_profile)
+	var hold_time := _combat_controller.primary_attack_hold_time
+	var repeat_ready := _combat_controller.primary_attack_repeat_ready
+	var repeat_active := _combat_controller.primary_attack_repeat_active
+
+	_clear_attack_runtime_state()
+
+	if not should_preserve_hold:
+		return
+	_combat_controller.primary_attack_hold_time = hold_time
+	_combat_controller.primary_attack_repeat_ready = repeat_ready
+	_combat_controller.primary_attack_repeat_active = repeat_active
+	_sync_primary_attack_input_debug_fields()
+
+
+func _should_preserve_hold_repeat_input(attack_profile: Resource) -> bool:
+	return _firearm_controller.should_preserve_hold_repeat_input(
+		attack_profile,
+		equipped_weapon,
+		_is_repeat_attack_enabled(attack_profile),
+		_is_key_currently_pressed(primary_attack_key)
+	)
+
+
+func _clear_attack_cooldown_after_animation(attack_profile: Resource) -> void:
+	var input_mode := _get_attack_input_mode(attack_profile)
+	if input_mode == PCC.INPUT_TAP_COMBO:
+		attack_cooldown_remaining = 0.0
+	elif _firearm_controller.should_clear_cooldown_after_animation(
+		attack_profile,
+		equipped_weapon,
+		_is_key_currently_pressed(primary_attack_key)
+	):
 		attack_cooldown_remaining = 0.0
 
 
@@ -695,125 +730,28 @@ func _execute_projectile_attack(attack_profile: Resource, animation_name: String
 	if attack_profile == null:
 		return
 
-	var projectile_scene := attack_profile.get("projectile_scene") as PackedScene
-	if projectile_scene == null:
-		return
-
-	var projectile := projectile_scene.instantiate() as Node2D
-	if projectile == null:
-		return
-
 	var parent := get_parent()
 	if parent == null:
 		parent = get_tree().current_scene
 	if parent == null:
-		projectile.queue_free()
 		return
 
-	parent.add_child(projectile)
-	projectile.global_position = _projectile_spawn_position()
-	if projectile.has_method("launch"):
-		projectile.launch(self, _direction_vector_from_name(current_direction), attack_profile, target_group)
-	_spawn_muzzle_flash(attack_profile, animation_name)
-	_spawn_bullet_casing(attack_profile, animation_name)
+	_firearm_controller.execute_projectile_attack(
+		self,
+		parent,
+		get_node_or_null("/root/EffectManager"),
+		attack_profile,
+		animation_name,
+		current_direction,
+		target_group,
+		_projectile_spawn_position(),
+		_equipment_visual_offset_for_animation(animation_name)
+	)
 
 
 func _projectile_spawn_position() -> Vector2:
 	var offset: Vector2 = attack_area_offsets.get(current_direction, Vector2(10, 1))
 	return global_position + offset
-
-
-func _spawn_muzzle_flash(attack_profile: Resource, animation_name: String) -> void:
-	var muzzle_flash_scene := attack_profile.get("muzzle_flash_scene") as PackedScene
-	if muzzle_flash_scene == null:
-		return
-
-	var parent := get_parent()
-	if parent == null:
-		parent = get_tree().current_scene
-	if parent == null:
-		return
-
-	var muzzle_flash := _spawn_effect_node(muzzle_flash_scene, parent, "muzzle_flash", int(attack_profile.get("muzzle_flash_pool_limit")))
-	if muzzle_flash == null:
-		return
-	muzzle_flash.global_position = global_position + _equipment_visual_offset_for_animation(animation_name) + _muzzle_flash_offset(attack_profile)
-	if muzzle_flash.has_method("play"):
-		muzzle_flash.play(current_direction)
-
-
-func _muzzle_flash_offset(attack_profile: Resource) -> Vector2:
-	if current_direction == "side_left":
-		return attack_profile.get("muzzle_flash_offset_side_left")
-	if current_direction == "up":
-		return attack_profile.get("muzzle_flash_offset_up")
-	if current_direction == "down":
-		return attack_profile.get("muzzle_flash_offset_down")
-	return attack_profile.get("muzzle_flash_offset_side")
-
-
-func _spawn_bullet_casing(attack_profile: Resource, animation_name: String) -> void:
-	var casing_scene := attack_profile.get("casing_scene") as PackedScene
-	if casing_scene == null:
-		return
-
-	var parent := get_parent()
-	if parent == null:
-		parent = get_tree().current_scene
-	if parent == null:
-		return
-
-	var casing := _spawn_effect_node(casing_scene, parent, "bullet_casing", int(attack_profile.get("casing_pool_limit")))
-	if casing == null:
-		return
-	var eject_direction := _casing_eject_direction()
-	casing.global_position = global_position + _equipment_visual_offset_for_animation(animation_name) + _casing_offset(attack_profile) + _casing_left_eject_spawn_offset(eject_direction)
-	casing.set_meta("spawn_position", casing.global_position)
-	if casing.has_method("launch"):
-		var eject_speed := float(attack_profile.get("casing_eject_speed"))
-		var speed_variance := float(attack_profile.get("casing_speed_variance"))
-		var varied_speed := eject_speed + randf_range(-speed_variance, speed_variance)
-		casing.launch(eject_direction, varied_speed, float(attack_profile.get("casing_lifetime")))
-
-
-func _casing_offset(attack_profile: Resource) -> Vector2:
-	if current_direction == "side_left":
-		return attack_profile.get("casing_offset_side_left")
-	if current_direction == "up":
-		return attack_profile.get("casing_offset_up")
-	if current_direction == "down":
-		return attack_profile.get("casing_offset_down")
-	return attack_profile.get("casing_offset_side")
-
-
-func _casing_eject_direction() -> Vector2:
-	if current_direction == "side_left":
-		return Vector2(1.0, -0.35)
-	if current_direction == "side":
-		return Vector2(-1.0, -0.35)
-	if current_direction == "up":
-		return Vector2(_random_casing_side(), randf_range(0.05, 0.35))
-	return Vector2(_random_casing_side(), randf_range(-0.4, -0.1))
-
-
-func _casing_left_eject_spawn_offset(eject_direction: Vector2) -> Vector2:
-	if not current_direction in ["up", "down"] or eject_direction.x >= 0.0:
-		return Vector2.ZERO
-	return Vector2(randf_range(-4.0, -2.0), 0.0)
-
-
-func _random_casing_side() -> float:
-	return -1.0 if randf() < 0.5 else 1.0
-
-
-func _spawn_effect_node(effect_scene: PackedScene, parent: Node, category: String, limit: int) -> Node2D:
-	var effect_manager := get_node_or_null("/root/EffectManager")
-	if effect_manager != null and effect_manager.has_method("spawn_effect"):
-		return effect_manager.spawn_effect(effect_scene, parent, category, limit) as Node2D
-	var effect := effect_scene.instantiate() as Node2D
-	if effect != null:
-		parent.add_child(effect)
-	return effect
 
 
 func _try_repeat_held_attack() -> bool:

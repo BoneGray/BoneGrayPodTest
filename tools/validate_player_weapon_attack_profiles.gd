@@ -4,6 +4,8 @@ extends SceneTree
 const PLAYER_SCENE_PATH := "res://scenes/characters/player.tscn"
 const BAT_DATA_PATH := "res://resources/equipment/weapons/baseball_bat/baseball_bat_data.tres"
 const GUN_DATA_PATH := "res://resources/equipment/weapons/gun/gun_data.tres"
+const PISTOL_DATA_PATH := "res://resources/equipment/weapons/pistol/pistol_data.tres"
+const SHOTGUN_DATA_PATH := "res://resources/equipment/weapons/shotgun/shotgun_data.tres"
 const UNARMED_PRIMARY_PATH := "res://resources/equipment/weapons/unarmed/unarmed_primary_attack.tres"
 const UNARMED_SECONDARY_PATH := "res://resources/equipment/weapons/unarmed/unarmed_secondary_attack.tres"
 
@@ -16,9 +18,11 @@ func _run() -> void:
 	var player_scene := load(PLAYER_SCENE_PATH) as PackedScene
 	var bat_data := load(BAT_DATA_PATH) as Resource
 	var gun_data := load(GUN_DATA_PATH) as Resource
+	var pistol_data := load(PISTOL_DATA_PATH) as Resource
+	var shotgun_data := load(SHOTGUN_DATA_PATH) as Resource
 	var unarmed_primary := load(UNARMED_PRIMARY_PATH) as Resource
 	var unarmed_secondary := load(UNARMED_SECONDARY_PATH) as Resource
-	if player_scene == null or bat_data == null or gun_data == null or unarmed_primary == null or unarmed_secondary == null:
+	if player_scene == null or bat_data == null or gun_data == null or pistol_data == null or shotgun_data == null or unarmed_primary == null or unarmed_secondary == null:
 		_fail("Could not load player weapon attack profile dependencies.")
 		return
 
@@ -76,12 +80,44 @@ func _run() -> void:
 		"active_frames": [0],
 		"movement_rule": "slow_locked_direction",
 	})
+	_assert_profile(pistol_data, "primary_attack_profile", {
+		"attack_type": "projectile",
+		"input_mode": "hold_repeat",
+		"repeat_mode": "enabled",
+		"hold_to_repeat_delay": 0.16,
+		"damage": 18,
+		"cooldown": 0.32,
+		"cancel_last_frames": 0,
+		"startup_frames": [0],
+		"active_frames": [0],
+		"movement_rule": "slow_locked_direction",
+	})
+	_assert_profile(shotgun_data, "primary_attack_profile", {
+		"attack_type": "projectile",
+		"input_mode": "hold_repeat",
+		"repeat_mode": "enabled",
+		"hold_to_repeat_delay": 0.28,
+		"damage": 7,
+		"cooldown": 0.85,
+		"cancel_last_frames": 0,
+		"startup_frames": [0],
+		"active_frames": [0],
+		"movement_rule": "slow_locked_direction",
+		"projectile_count": 5,
+		"projectile_spread_degrees": 22.0,
+	})
 	_assert_equal(int(bat_data.get("attack_power")), 0, "Bat attack_power should stay as migration fallback.")
 	_assert_equal(float(bat_data.get("attack_cooldown")), 0.0, "Bat attack_cooldown should stay as migration fallback.")
 	_assert_equal(bool(bat_data.get("repeat_while_held")), false, "Bat repeat_while_held should stay as migration fallback.")
 	_assert_equal(int(gun_data.get("attack_power")), 0, "Gun attack_power should stay as migration fallback.")
 	_assert_equal(float(gun_data.get("attack_cooldown")), 0.0, "Gun attack_cooldown should stay as migration fallback.")
 	_assert_equal(bool(gun_data.get("repeat_while_held")), false, "Gun repeat_while_held should stay as migration fallback.")
+	_assert_equal(int(pistol_data.get("attack_power")), 0, "Pistol attack_power should stay as migration fallback.")
+	_assert_equal(float(pistol_data.get("attack_cooldown")), 0.0, "Pistol attack_cooldown should stay as migration fallback.")
+	_assert_equal(bool(pistol_data.get("repeat_while_held")), false, "Pistol repeat_while_held should stay as migration fallback.")
+	_assert_equal(int(shotgun_data.get("attack_power")), 0, "Shotgun attack_power should stay as migration fallback.")
+	_assert_equal(float(shotgun_data.get("attack_cooldown")), 0.0, "Shotgun attack_cooldown should stay as migration fallback.")
+	_assert_equal(bool(shotgun_data.get("repeat_while_held")), false, "Shotgun repeat_while_held should stay as migration fallback.")
 
 	var root := Node2D.new()
 	get_root().add_child(root)
@@ -117,6 +153,44 @@ func _run() -> void:
 	if String(player.call("_get_current_attack_movement_rule")) != "slow_locked_direction":
 		root.queue_free()
 		_fail("Gun attack movement rule should lock direction.")
+		return
+
+	player.call("equip_weapon", pistol_data)
+	await process_frame
+	var pistol_primary := pistol_data.get("primary_attack_profile") as Resource
+	if absf(float(player.call("get_attack_cooldown", pistol_primary)) - 0.32) > 0.001:
+		root.queue_free()
+		_fail("Pistol attack cooldown should come from its primary AttackProfile.")
+		return
+	if not bool(player.call("_is_repeat_attack_enabled", pistol_primary)):
+		root.queue_free()
+		_fail("Pistol should enable hold-repeat.")
+		return
+	if absf(float(player.call("_get_hold_to_repeat_delay", pistol_primary)) - 0.16) > 0.001:
+		root.queue_free()
+		_fail("Pistol hold-repeat delay should come from its primary AttackProfile.")
+		return
+
+	player.call("equip_weapon", shotgun_data)
+	await process_frame
+	var shotgun_primary := shotgun_data.get("primary_attack_profile") as Resource
+	if absf(float(player.call("get_attack_cooldown", shotgun_primary)) - 0.85) > 0.001:
+		root.queue_free()
+		_fail("Shotgun attack cooldown should come from its primary AttackProfile.")
+		return
+	if not bool(player.call("_is_repeat_attack_enabled", shotgun_primary)):
+		root.queue_free()
+		_fail("Shotgun should enable hold-repeat.")
+		return
+	if absf(float(player.call("_get_hold_to_repeat_delay", shotgun_primary)) - 0.28) > 0.001:
+		root.queue_free()
+		_fail("Shotgun hold-repeat delay should come from its primary AttackProfile.")
+		return
+	player.call("attack", "attack_first", "side")
+	await process_frame
+	if String(player.call("_get_current_attack_movement_rule")) != "slow_locked_direction":
+		root.queue_free()
+		_fail("Shotgun attack movement rule should lock direction.")
 		return
 
 	print("Player weapon attack profiles validation passed.")

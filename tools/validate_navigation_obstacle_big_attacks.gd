@@ -18,10 +18,21 @@ func _run() -> void:
 	get_root().add_child(root)
 	await process_frame
 
-	var big := root.get_node_or_null("NavBig1") as BaseEnemy
-	if big == null:
-		_fail(root, "Navigation obstacle test scene is missing NavBig1.")
+	var player := root.get_node_or_null("WorldActors/Player") as CharacterBody2D
+	var big := root.get_node_or_null("WorldActors/NavBig1") as BaseEnemy
+	if player == null or big == null:
+		_fail(root, "Navigation obstacle test scene is missing Player or NavBig1.")
 		return
+	for enemy_path in ["WorldActors/EnemyZombieAxe", "WorldActors/NavEnemy1"]:
+		var enemy := root.get_node_or_null(enemy_path)
+		if enemy != null:
+			enemy.queue_free()
+
+	player.global_position = Vector2(156, 144)
+	big.global_position = Vector2(184, 144)
+	big.set("use_navigation_agent", true)
+	big.call("set_target", player)
+	await physics_frame
 
 	for i in 120:
 		await physics_frame

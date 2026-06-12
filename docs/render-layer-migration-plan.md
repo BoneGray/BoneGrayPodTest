@@ -1,6 +1,6 @@
 # 渲染层级迁移流程
 
-本文定义图层系统的修订流程，避免为了某一个测试场景写特例。`navigation_obstacle_test_scene` 只是第一版样板场景，后续主场景和新场景都应按同一流程迁移。
+本文定义图层系统的修订流程，避免为了某一个测试场景写特例。`navigation_obstacle_test_scene` 是当前主力样板场景，后续主场景和新场景都应按同一流程迁移。
 
 ## 修订目标
 
@@ -78,13 +78,18 @@ SceneRoot
 
 - `docs/render-layer-guidelines.md` 定义了项目级规则。
 - `scripts/render/render_layers.gd` 提供了统一层级常量。
-- `navigation_obstacle_test_scene` 已作为第一版样板场景，具备 `TerrainLayer`、`WorldActors`、`WorldEffects`、`HighOverlay`。
-- Player、Big、Small、Axe、枪拾取物、木棒拾取物根节点已统一到世界 YSort 基准层。
+- `navigation_obstacle_test_scene` 已作为当前主力样板场景，具备 `TerrainLayer`、`WorldActors`、`WorldEffects`、`HighOverlay`。
+- Player、Big、Small、Axe、枪械拾取物、木棒拾取物和红色障碍主体已统一到 `WorldActors` 世界 YSort 基准层。
 
-待迁移：
+已移除，不再维护：
 
-- `combat_test_scene` 仍是旧式根节点 YSort 结构，后续可以改成标准容器。
-- `myScene` 仍使用旧式 TileMap + `Node` YSort 容器，后续可以改成标准容器。
+- `combat_test_scene`
+- `myScene`
+- `terrain_random_demo`
+- `floor_only_random_map`
+
+待补充：
+
 - 真实树木、建筑、屋顶、天花板、高层遮挡还没有进入样板验证。
 
 ## 验证要求

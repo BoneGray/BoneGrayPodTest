@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="WeaponData" load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scripts/equipment/weapon_data.gd" id="1_weapon_data"]
+[ext_resource type="Texture2D" path="res://assets/equipment/weapons/pistol/pistol_world.png" id="2_world"]
+[ext_resource type="Texture2D" path="res://assets/equipment/weapons/pistol/pistol_icon.png" id="3_icon"]
+[ext_resource type="SpriteFrames" path="res://resources/equipment/weapons/pistol/pistol_sprite_frames.tres" id="4_frames"]
+[ext_resource type="Resource" path="res://resources/equipment/weapons/pistol/pistol_primary_attack.tres" id="5_primary"]
+
+[resource]
+script = ExtResource("1_weapon_data")
+weapon_id = "pistol"
+display_name = "Pistol"
+weapon_type = "firearm"
+world_texture = ExtResource("2_world")
+icon_texture = ExtResource("3_icon")
+visual_sprite_frames = ExtResource("4_frames")
+animation_visual_offsets = {
+"idle_down": Vector2(0, 3),
+"idle_side": Vector2(2, 1),
+"idle_side_left": Vector2(-2, 1),
+"idle_up": Vector2(0, -3),
+"walk_down": Vector2(0, 3),
+"walk_side": Vector2(2, 1),
+"walk_side_left": Vector2(-2, 1),
+"walk_up": Vector2(0, -3)
+}
+pickup_scene_path = "res://scenes/items/weapons/pistol_pickup.tscn"
+primary_attack_profile = ExtResource("5_primary")

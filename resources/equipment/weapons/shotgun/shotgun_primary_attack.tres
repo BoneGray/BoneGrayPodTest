@@ -1,0 +1,42 @@
+[gd_resource type="Resource" script_class="AttackProfile" format=3 uid="uid://csaena7tqxhtq"]
+
+[ext_resource type="Script" uid="uid://dntfyvnqos6k" path="res://scripts/equipment/attack_profile.gd" id="1_attack_profile"]
+[ext_resource type="PackedScene" path="res://scenes/projectiles/shotgun_bullet_projectile.tscn" id="2_bullet_scene"]
+[ext_resource type="PackedScene" path="res://scenes/effects/weapons/gun_muzzle_flash.tscn" id="3_muzzle_flash"]
+[ext_resource type="PackedScene" path="res://scenes/effects/weapons/gun_bullet_casing.tscn" id="4_bullet_casing"]
+[ext_resource type="PackedScene" path="res://scenes/effects/projectiles/bullet_wall_impact.tscn" id="5_wall_impact"]
+
+[resource]
+script = ExtResource("1_attack_profile")
+profile_id = "shotgun_primary"
+attack_type = "projectile"
+damage = 7
+cooldown = 0.8
+input_mode = "hold_repeat"
+repeat_mode = "enabled"
+hold_to_repeat_delay = 0.28
+cancel_last_frames = 0
+startup_frames = Array[int]([0])
+active_frames = Array[int]([0])
+movement_rule = "slow_locked_direction"
+projectile_scene = ExtResource("2_bullet_scene")
+projectile_speed = 185.0
+projectile_lifetime = 0.48
+projectile_count = 5
+projectile_spread_degrees = 22.0
+wall_impact_scene = ExtResource("5_wall_impact")
+wall_impact_pool_limit = 50
+muzzle_flash_scene = ExtResource("3_muzzle_flash")
+muzzle_flash_offset_down = Vector2(0, 13)
+muzzle_flash_offset_up = Vector2(0, -15)
+muzzle_flash_offset_side = Vector2(18, -1)
+muzzle_flash_offset_side_left = Vector2(-18, -1)
+casing_scene = ExtResource("4_bullet_casing")
+casing_offset_down = Vector2(5, 6)
+casing_offset_up = Vector2(5, -8)
+casing_offset_side = Vector2(7, 0)
+casing_offset_side_left = Vector2(-7, 0)
+casing_eject_speed = 46.0
+casing_speed_variance = 10.0
+casing_lifetime = 0.42
+casing_pool_limit = 40

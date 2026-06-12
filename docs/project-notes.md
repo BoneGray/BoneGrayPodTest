@@ -55,57 +55,32 @@ Rule source:
 - They keep the same atlas tile coordinates, `Terrain Set 0`, `Terrain 0`, and peering bits.
 - Only the texture reference changes.
 
-## Time Of Day TileSet Switching
+## Current Gameplay Test Scene
 
-Scene:
+Current maintained gameplay scene:
 
-- `res://scenes/myScene.tscn`
+- `res://scenes/navigation_obstacle_test_scene.tscn`
 
-Script:
+Scene generator:
 
-- `res://scripts/time_of_day_tileset_switcher.gd`
+- `res://tools/create_navigation_obstacle_test_scene.gd`
 
-Buttons:
+Validation:
 
-- `早`: `res://resources/tiles/background_dark_green_tileset.tres`
-- `中`: `res://resources/tiles/background_green_tileset.tres`
-- `晚`: `res://resources/tiles/background_bleak_yellow_tileset.tres`
+- `res://tools/validate_navigation_obstacle_test_scene.gd`
+- `res://tools/validate_render_layer_baseline.gd`
+- `res://tools/validate_navigation_obstacle_big_attacks.gd`
 
-Default time is `晚`.
+Rules:
 
-The script recursively finds all `TileMapLayer` nodes under the current scene and replaces their `tile_set`.
-Because the three TileSets share the same atlas layout and Terrain peering bits, existing `tile_map_data` does not need to be repainted.
+- The scene uses `TerrainLayer`, `WorldActors`, `WorldEffects`, and `HighOverlay`.
+- Player, Big, Small, Axe, pickups, and obstacle bodies live under `WorldActors` so they follow the current YSort layer rules.
+- Deleted legacy scenes such as `myScene`, `combat_test_scene`, `terrain_random_demo`, and `floor_only_random_map` are not maintained.
+- Do not restore old root-level YSort test scenes; rebuild old experiments inside the current scene structure if the feature returns.
 
-## Terrain Random Demo
+## Archived Prototypes
 
-Scene:
+Earlier time-of-day TileSet switching and random terrain demos were removed with their old scenes. They are kept here only as history:
 
-- `res://scenes/terrain_random_demo.tscn`
-
-Script:
-
-- `res://scripts/terrain_random_demo.gd`
-
-The scene uses `res://resources/tiles/background_bleak_yellow_tileset.tres` with `Terrain Set 0 / Terrain 0` to generate random terrain.
-
-Core call:
-
-```gdscript
-terrain_layer.set_cells_terrain_connect(terrain_cells, 0, 0, false)
-```
-
-Meaning:
-
-- `terrain_cells`: generated map cell collection.
-- First `0`: Terrain Set 0.
-- Second `0`: Terrain 0.
-- `false`: do not ignore empty terrain, so borders can choose edge tiles based on empty neighbors.
-
-Generation method:
-
-- Generate several large blobs.
-- Connect regions with a curved path.
-- Add a few random small blobs.
-- Randomly cut some edge cells to avoid a square outline.
-
-The final tile choice is made by Godot Terrain peering bits, not by manually assigning atlas coordinates in script.
+- Time-of-day switching should be rebuilt inside the current maintained scene structure if needed.
+- Terrain random demos should use the current `TerrainLayer / WorldActors / WorldEffects / HighOverlay` structure if needed.

@@ -52,6 +52,8 @@ Current player weapon input modes:
 - Unarmed: `tap_combo`
 - Baseball bat: `tap_combo`
 - Automatic gun: `hold_repeat`
+- Pistol: `hold_repeat`
+- Shotgun: `hold_repeat`
 
 Tap combo rules:
 
@@ -63,8 +65,12 @@ Tap combo rules:
 
 Hold repeat rules:
 
+- Firearms use `hold_repeat` as the unified input feel. Their differences should come from cooldown, damage, projectile count, spread, reload/ammo rules, and visual timing rather than separate input modes.
+- The automatic gun is the current firearm behavior baseline. New firearms should inherit its runtime rules unless we explicitly design an exception: hold-repeat input, enabled repeat mode, slow movement during attack, locked firing direction, preserved hold timing while moving, and clean repeat-state cleanup after release.
+- Pistol and shotgun should differ from the automatic gun through data such as damage, cooldown, projectile count, projectile spread, projectile speed, lifetime, muzzle offsets, casing offsets, reload, and ammo rules, not through custom Player branches.
 - `hold_to_repeat_delay` controls how long the player must hold before repeated attacks begin.
 - The repeated attack interval comes from the current attack `cooldown`.
+- For `hold_repeat` firearms, `cooldown` controls repeated fire while the attack key remains held. If the player only taps and releases, the completed firing animation should clear the runtime cooldown so the next tap can start cleanly.
 - Hold repeat should not use short-press input buffering or recovery canceling.
 - Hold repeat is a temporary held-input state. Releasing the attack key should clear repeat state, cancel repeat-only animation lock, and restore normal movement speed and turning.
 - Automatic firearms should usually set `cancel_last_frames = 0`.
@@ -77,6 +83,8 @@ Player weapon combat data should live on `AttackProfile` first:
 - `AttackProfile.repeat_mode` and `hold_to_repeat_delay` define hold-repeat behavior when needed.
 - `AttackProfile.startup_frames`, `active_frames`, and `recovery_frames` define the attack phase timeline. If they are empty, runtime may derive phases from `hit_frames` for migration compatibility.
 - `AttackProfile.movement_rule` defines movement during attack. Current rules are `slow_locked_direction`, `slow_turn_to_input`, and `rooted`; `inherit` keeps the old input-mode-based fallback.
+- Projectile weapons may use `projectile_count` and `projectile_spread_degrees` to describe multi-pellet attacks such as shotguns. Weapon-specific spread should stay in data, not in hard-coded Player branches.
+- Firearm runtime behavior is centralized in `FirearmController`. Player should not branch by a specific firearm name; new firearm differences should be expressed through attack/equipment data first.
 - `WeaponData.attack_power`, `attack_cooldown`, `repeat_while_held`, and `hold_to_repeat_delay` are migration fallback fields only. New weapons should leave them at defaults and configure the attack profile instead.
 - Fourth-step resourceization closeout is tracked in `docs/combat-data-resourceization-closeout.md`.
 

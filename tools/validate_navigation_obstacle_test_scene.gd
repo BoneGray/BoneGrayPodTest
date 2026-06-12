@@ -9,6 +9,7 @@ const BIG_SPRITE_FRAMES_PATH := "res://resources/characters/enemies/zombie_big_s
 const AXE_STATS_PATH := "res://resources/characters/enemies/zombie_axe_stats.tres"
 const AXE_SPRITE_FRAMES_PATH := "res://resources/characters/enemies/zombie_axe_sprite_frames.tres"
 const EXPECTED_OBSTACLE_COUNT := 7
+const EXPECTED_PICKUPS := ["BaseballBatPickup", "GunPickup", "PistolPickup", "ShotgunPickup"]
 
 
 func _initialize() -> void:
@@ -35,14 +36,14 @@ func _run() -> void:
 	var enemies := world_actors.find_children("NavEnemy*", "CharacterBody2D", false, false) if world_actors != null else []
 	var big_enemies := world_actors.find_children("NavBig*", "CharacterBody2D", false, false) if world_actors != null else []
 	var axe_enemy := root.get_node_or_null("WorldActors/EnemyZombieAxe") as CharacterBody2D
-	var obstacles := root.find_children("*", "StaticBody2D", false, false)
+	var obstacles := root.find_children("*", "StaticBody2D", true, false)
 	if navigation_region == null or world_actors == null or player == null or axe_enemy == null or enemies.size() < 1 or big_enemies.size() < 1:
 		_fail(root, "Navigation obstacle test scene is missing required gameplay nodes.")
 		return
 	if not world_actors.y_sort_enabled:
 		_fail(root, "WorldActors should enable y-sort for characters and pickups.")
 		return
-	for node_name in ["BaseballBatPickup", "GunPickup"]:
+	for node_name in EXPECTED_PICKUPS:
 		var pickup := world_actors.get_node_or_null(node_name) as Node2D
 		if pickup == null:
 			_fail(root, "%s should be under WorldActors for y-sort." % node_name)
@@ -61,6 +62,10 @@ func _run() -> void:
 	if obstacles.size() < EXPECTED_OBSTACLE_COUNT:
 		_fail(root, "Navigation obstacle test scene does not have enough obstacle bodies.")
 		return
+	for obstacle in obstacles:
+		if obstacle.get_parent() != world_actors:
+			_fail(root, "%s should live under WorldActors so obstacle visuals participate in y-sort." % obstacle.name)
+			return
 
 	var navigation_polygon := navigation_region.navigation_polygon
 	if navigation_polygon == null or navigation_polygon.get_polygon_count() == 0:

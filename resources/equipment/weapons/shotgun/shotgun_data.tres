@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="WeaponData" format=3 uid="uid://dxgy1iur8i8v"]
+
+[ext_resource type="Script" uid="uid://c7bci1o77ogwu" path="res://scripts/equipment/weapon_data.gd" id="1_weapon_data"]
+[ext_resource type="Texture2D" uid="uid://bd3wus2ii7qlj" path="res://assets/equipment/weapons/shotgun/shotgun_world.png" id="2_world"]
+[ext_resource type="Texture2D" uid="uid://cb0ip8jk1u8ax" path="res://assets/equipment/weapons/shotgun/shotgun_icon.png" id="3_icon"]
+[ext_resource type="SpriteFrames" uid="uid://bistghpwrgngm" path="res://resources/equipment/weapons/shotgun/shotgun_sprite_frames.tres" id="4_frames"]
+[ext_resource type="Resource" uid="uid://csaena7tqxhtq" path="res://resources/equipment/weapons/shotgun/shotgun_primary_attack.tres" id="5_primary"]
+
+[resource]
+script = ExtResource("1_weapon_data")
+weapon_id = "shotgun"
+display_name = "Shotgun"
+weapon_type = "firearm"
+world_texture = ExtResource("2_world")
+icon_texture = ExtResource("3_icon")
+visual_sprite_frames = ExtResource("4_frames")
+animation_visual_offsets = {
+"idle_down": Vector2(0, 4),
+"idle_side": Vector2(3, 1),
+"idle_side_left": Vector2(-3, 1),
+"idle_up": Vector2(0, -3),
+"walk_down": Vector2(0, 4),
+"walk_side": Vector2(3, 1),
+"walk_side_left": Vector2(-3, 1),
+"walk_up": Vector2(0, -3)
+}
+pickup_scene_path = "res://scenes/items/weapons/shotgun_pickup.tscn"
+primary_attack_profile = ExtResource("5_primary")

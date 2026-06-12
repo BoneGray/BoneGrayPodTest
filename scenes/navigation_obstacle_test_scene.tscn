@@ -1,161 +1,214 @@
-[gd_scene format=3 uid="uid://b60b21w0lwxke"]
+[gd_scene format=3]
 
-[ext_resource type="Script" uid="uid://dxhg5ioo3crwh" path="res://scripts/camera_follow_target.gd" id="1_408im"]
-[ext_resource type="PackedScene" uid="uid://cid64ugn1d0ua" path="res://scenes/characters/player.tscn" id="2_2usuc"]
-[ext_resource type="PackedScene" path="res://scenes/characters/enemy_zombie_axe.tscn" id="3_p1xi7"]
-[ext_resource type="PackedScene" path="res://scenes/characters/enemy_zombie_small.tscn" id="5_vkqie"]
-[ext_resource type="PackedScene" path="res://scenes/items/weapons/baseball_bat_pickup.tscn" id="6_63h0e"]
-[ext_resource type="PackedScene" path="res://scenes/characters/enemy.tscn" id="6_qtbig"]
-[ext_resource type="PackedScene" path="res://scenes/items/weapons/gun_pickup.tscn" id="7_408im"]
+[ext_resource type="PackedScene" path="res://scenes/characters/player.tscn" id="1_mrhly"]
+[ext_resource type="Script" path="res://scripts/zombie_big_attack_controller.gd" id="2_0wvrk"]
+[ext_resource type="Resource" path="res://resources/characters/player/player_stats.tres" id="3_hyemf"]
+[ext_resource type="Resource" path="res://resources/equipment/weapons/unarmed/unarmed_primary_attack.tres" id="4_hsorm"]
+[ext_resource type="Resource" path="res://resources/equipment/weapons/unarmed/unarmed_secondary_attack.tres" id="5_hbx8k"]
+[ext_resource type="PackedScene" path="res://scenes/characters/enemy_zombie_axe.tscn" id="6_3gf0m"]
+[ext_resource type="Script" path="res://scripts/enemies/base_enemy.gd" id="7_na3ov"]
+[ext_resource type="Resource" path="res://resources/characters/enemies/zombie_axe_stats.tres" id="8_mtuwf"]
+[ext_resource type="PackedScene" path="res://scenes/characters/enemy_zombie_small.tscn" id="9_j5lvw"]
+[ext_resource type="Resource" path="res://resources/characters/enemies/zombie_small_stats.tres" id="10_jdsd7"]
+[ext_resource type="PackedScene" path="res://scenes/characters/enemy.tscn" id="11_skmfj"]
+[ext_resource type="Resource" path="res://resources/characters/enemies/zombie_big_stats.tres" id="12_s5lvl"]
+[ext_resource type="PackedScene" path="res://scenes/items/weapons/baseball_bat_pickup.tscn" id="13_l14po"]
+[ext_resource type="Script" path="res://scripts/items/weapon_pickup.gd" id="14_lcqbh"]
+[ext_resource type="Resource" path="res://resources/equipment/weapons/baseball_bat/baseball_bat_data.tres" id="15_2c37a"]
+[ext_resource type="PackedScene" path="res://scenes/items/weapons/gun_pickup.tscn" id="16_s7at2"]
+[ext_resource type="Resource" path="res://resources/equipment/weapons/gun/gun_data.tres" id="17_glpy8"]
+[ext_resource type="PackedScene" path="res://scenes/items/weapons/pistol_pickup.tscn" id="18_kofty"]
+[ext_resource type="Resource" path="res://resources/equipment/weapons/pistol/pistol_data.tres" id="19_ryxvi"]
+[ext_resource type="PackedScene" path="res://scenes/items/weapons/shotgun_pickup.tscn" id="20_81cml"]
+[ext_resource type="Resource" path="res://resources/equipment/weapons/shotgun/shotgun_data.tres" id="21_x5djv"]
+[ext_resource type="Script" path="res://scripts/camera_follow_target.gd" id="22_6m88s"]
 
-[sub_resource type="NavigationPolygon" id="NavigationPolygon_wwjcm"]
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_dvc2r"]
+size = Vector2(400, 16)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_cyice"]
+size = Vector2(400, 16)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_5sgey"]
+size = Vector2(16, 280)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_m1uc8"]
+size = Vector2(16, 280)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_78esv"]
+size = Vector2(40, 104)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_0oxxs"]
+size = Vector2(96, 32)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_or7g2"]
+size = Vector2(32, 64)
+
+[sub_resource type="NavigationPolygon" id="NavigationPolygon_d8da0"]
 vertices = PackedVector2Array(424, 56, 424, 304, 380, 220, 380, 164, 356, 148, 260, 164, 300, 148, 56, 304, 260, 220, 220, 212, 156, 212, 56, 56, 156, 84, 356, 60, 300, 60, 220, 84)
 polygons = Array[PackedInt32Array]([PackedInt32Array(0, 1, 2, 3), PackedInt32Array(4, 3, 5, 6), PackedInt32Array(2, 1, 7, 8), PackedInt32Array(9, 8, 7, 10), PackedInt32Array(10, 7, 11, 12), PackedInt32Array(0, 3, 4, 13), PackedInt32Array(11, 0, 13, 14), PackedInt32Array(12, 11, 14, 15), PackedInt32Array(15, 14, 6, 5), PackedInt32Array(9, 15, 5, 8)])
 outlines = Array[PackedVector2Array]([PackedVector2Array(56, 56, 424, 56, 424, 304, 56, 304), PackedVector2Array(156, 84, 220, 84, 220, 212, 156, 212), PackedVector2Array(260, 164, 380, 164, 380, 220, 260, 220), PackedVector2Array(300, 60, 356, 60, 356, 148, 300, 148)])
 
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_pnunq"]
-size = Vector2(400, 16)
+[node name="NavigationObstacleTestScene" type="Node2D" unique_id=947608256]
 
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_u4paa"]
-size = Vector2(400, 16)
-
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_unj6n"]
-size = Vector2(16, 280)
-
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_ht6pj"]
-size = Vector2(16, 280)
-
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_vc7jk"]
-size = Vector2(40, 104)
-
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_knca8"]
-size = Vector2(96, 32)
-
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_q3mvc"]
-size = Vector2(32, 64)
-
-[node name="NavigationObstacleTestScene" type="Node2D" unique_id=825919720]
-
-[node name="TerrainLayer" type="Node2D" parent="."]
+[node name="TerrainLayer" type="Node2D" parent="." unique_id=761109488]
 z_index = -100
 
-[node name="Floor" type="Polygon2D" parent="TerrainLayer" unique_id=22070971]
+[node name="Floor" type="Polygon2D" parent="TerrainLayer" unique_id=2059222882]
 color = Color(0.23, 0.23, 0.23, 1)
 polygon = PackedVector2Array(56, 56, 424, 56, 424, 304, 56, 304)
 
-[node name="NavigationRegion2D" type="NavigationRegion2D" parent="." unique_id=745361588]
-navigation_polygon = SubResource("NavigationPolygon_wwjcm")
+[node name="WorldActors" type="Node2D" parent="." unique_id=1671770205]
+y_sort_enabled = true
 
-[node name="OuterObstacle1Body" type="StaticBody2D" parent="." unique_id=205147030]
+[node name="OuterObstacle1Body" type="StaticBody2D" parent="WorldActors" unique_id=362493468]
 position = Vector2(240, 48)
 collision_mask = 0
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="OuterObstacle1Body" unique_id=529194600]
-shape = SubResource("RectangleShape2D_pnunq")
+[node name="CollisionShape2D" type="CollisionShape2D" parent="WorldActors/OuterObstacle1Body" unique_id=1796814967]
+shape = SubResource("RectangleShape2D_dvc2r")
 
-[node name="OuterObstacle1Visual" type="Polygon2D" parent="OuterObstacle1Body" unique_id=137973359]
+[node name="OuterObstacle1Visual" type="Polygon2D" parent="WorldActors/OuterObstacle1Body" unique_id=779801834]
 color = Color(0.9, 0.08, 0.06, 0.9)
 polygon = PackedVector2Array(-200, -8, 200, -8, 200, 8, -200, 8)
 
-[node name="OuterObstacle2Body" type="StaticBody2D" parent="." unique_id=828974987]
+[node name="OuterObstacle2Body" type="StaticBody2D" parent="WorldActors" unique_id=1063318937]
 position = Vector2(240, 312)
 collision_mask = 0
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="OuterObstacle2Body" unique_id=121174854]
-shape = SubResource("RectangleShape2D_u4paa")
+[node name="CollisionShape2D" type="CollisionShape2D" parent="WorldActors/OuterObstacle2Body" unique_id=1564722367]
+shape = SubResource("RectangleShape2D_cyice")
 
-[node name="OuterObstacle2Visual" type="Polygon2D" parent="OuterObstacle2Body" unique_id=503139316]
+[node name="OuterObstacle2Visual" type="Polygon2D" parent="WorldActors/OuterObstacle2Body" unique_id=535056621]
 color = Color(0.9, 0.08, 0.06, 0.9)
 polygon = PackedVector2Array(-200, -8, 200, -8, 200, 8, -200, 8)
 
-[node name="OuterObstacle3Body" type="StaticBody2D" parent="." unique_id=1538317674]
+[node name="OuterObstacle3Body" type="StaticBody2D" parent="WorldActors" unique_id=1443379949]
 position = Vector2(48, 180)
 collision_mask = 0
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="OuterObstacle3Body" unique_id=1607897060]
-shape = SubResource("RectangleShape2D_unj6n")
+[node name="CollisionShape2D" type="CollisionShape2D" parent="WorldActors/OuterObstacle3Body" unique_id=1872452437]
+shape = SubResource("RectangleShape2D_5sgey")
 
-[node name="OuterObstacle3Visual" type="Polygon2D" parent="OuterObstacle3Body" unique_id=251739842]
+[node name="OuterObstacle3Visual" type="Polygon2D" parent="WorldActors/OuterObstacle3Body" unique_id=1130569081]
 color = Color(0.9, 0.08, 0.06, 0.9)
 polygon = PackedVector2Array(-8, -140, 8, -140, 8, 140, -8, 140)
 
-[node name="OuterObstacle4Body" type="StaticBody2D" parent="." unique_id=948216857]
+[node name="OuterObstacle4Body" type="StaticBody2D" parent="WorldActors" unique_id=465533669]
 position = Vector2(432, 180)
 collision_mask = 0
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="OuterObstacle4Body" unique_id=1824221567]
-shape = SubResource("RectangleShape2D_ht6pj")
+[node name="CollisionShape2D" type="CollisionShape2D" parent="WorldActors/OuterObstacle4Body" unique_id=447478791]
+shape = SubResource("RectangleShape2D_m1uc8")
 
-[node name="OuterObstacle4Visual" type="Polygon2D" parent="OuterObstacle4Body" unique_id=194984121]
+[node name="OuterObstacle4Visual" type="Polygon2D" parent="WorldActors/OuterObstacle4Body" unique_id=2076783317]
 color = Color(0.9, 0.08, 0.06, 0.9)
 polygon = PackedVector2Array(-8, -140, 8, -140, 8, 140, -8, 140)
 
-[node name="InnerObstacle1Body" type="StaticBody2D" parent="." unique_id=2037969688]
+[node name="InnerObstacle1Body" type="StaticBody2D" parent="WorldActors" unique_id=665505584]
 position = Vector2(188, 148)
 collision_mask = 0
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="InnerObstacle1Body" unique_id=1926877168]
-shape = SubResource("RectangleShape2D_vc7jk")
+[node name="CollisionShape2D" type="CollisionShape2D" parent="WorldActors/InnerObstacle1Body" unique_id=1075652810]
+shape = SubResource("RectangleShape2D_78esv")
 
-[node name="InnerObstacle1Visual" type="Polygon2D" parent="InnerObstacle1Body" unique_id=852466984]
+[node name="InnerObstacle1Visual" type="Polygon2D" parent="WorldActors/InnerObstacle1Body" unique_id=1120556793]
 color = Color(0.9, 0.08, 0.06, 0.9)
 polygon = PackedVector2Array(-20, -52, 20, -52, 20, 52, -20, 52)
 
-[node name="InnerObstacle2Body" type="StaticBody2D" parent="." unique_id=501379944]
+[node name="InnerObstacle2Body" type="StaticBody2D" parent="WorldActors" unique_id=1075703263]
 position = Vector2(320, 192)
 collision_mask = 0
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="InnerObstacle2Body" unique_id=2108868603]
-shape = SubResource("RectangleShape2D_knca8")
+[node name="CollisionShape2D" type="CollisionShape2D" parent="WorldActors/InnerObstacle2Body" unique_id=755101947]
+shape = SubResource("RectangleShape2D_0oxxs")
 
-[node name="InnerObstacle2Visual" type="Polygon2D" parent="InnerObstacle2Body" unique_id=68299488]
+[node name="InnerObstacle2Visual" type="Polygon2D" parent="WorldActors/InnerObstacle2Body" unique_id=1868007522]
 color = Color(0.9, 0.08, 0.06, 0.9)
 polygon = PackedVector2Array(-48, -16, 48, -16, 48, 16, -48, 16)
 
-[node name="InnerObstacle3Body" type="StaticBody2D" parent="." unique_id=1544739690]
+[node name="InnerObstacle3Body" type="StaticBody2D" parent="WorldActors" unique_id=128650551]
 position = Vector2(328, 104)
 collision_mask = 0
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="InnerObstacle3Body" unique_id=1639159501]
-shape = SubResource("RectangleShape2D_q3mvc")
+[node name="CollisionShape2D" type="CollisionShape2D" parent="WorldActors/InnerObstacle3Body" unique_id=95521747]
+shape = SubResource("RectangleShape2D_or7g2")
 
-[node name="InnerObstacle3Visual" type="Polygon2D" parent="InnerObstacle3Body" unique_id=1784242320]
+[node name="InnerObstacle3Visual" type="Polygon2D" parent="WorldActors/InnerObstacle3Body" unique_id=1805037371]
 color = Color(0.9, 0.08, 0.06, 0.9)
 polygon = PackedVector2Array(-16, -32, 16, -32, 16, 32, -16, 32)
 
-[node name="Camera2D" type="Camera2D" parent="." unique_id=1080269179]
-zoom = Vector2(2.5, 2.5)
-position_smoothing_enabled = true
-script = ExtResource("1_408im")
-target_path = NodePath("../WorldActors/Player")
-
-[node name="WorldActors" type="Node2D" parent="." unique_id=1884372589]
-y_sort_enabled = true
-z_index = 0
-
-[node name="Player" parent="WorldActors" unique_id=1160340334 instance=ExtResource("2_2usuc")]
+[node name="Player" type="CharacterBody2D" parent="WorldActors" unique_id=1160340334 groups=["player"] instance=ExtResource("1_mrhly")]
 position = Vector2(110, 149)
+collision_layer = 2
+script = ExtResource("2_0wvrk")
+stats = ExtResource("3_hyemf")
+target_group = "enemy"
+unarmed_primary_attack_profile = ExtResource("4_hsorm")
+unarmed_secondary_attack_profile = ExtResource("5_hbx8k")
+camera_follow_enabled = false
 
-[node name="EnemyZombieAxe" parent="WorldActors" unique_id=1305528959 instance=ExtResource("3_p1xi7")]
+[node name="EnemyZombieAxe" type="CharacterBody2D" parent="WorldActors" unique_id=1305528959 groups=["enemy"] instance=ExtResource("6_3gf0m")]
 position = Vector2(398, 282)
+collision_layer = 4
+script = ExtResource("7_na3ov")
+stats = ExtResource("8_mtuwf")
+use_navigation_agent = true
+no_weapon_close_attack_range = 26.0
 
-[node name="NavEnemy1" parent="WorldActors" unique_id=1197558562 instance=ExtResource("5_vkqie")]
+[node name="NavEnemy1" type="CharacterBody2D" parent="WorldActors" unique_id=1875604721 groups=["enemy"] instance=ExtResource("9_j5lvw")]
 position = Vector2(318, 244)
+collision_layer = 4
+script = ExtResource("7_na3ov")
+stats = ExtResource("10_jdsd7")
 use_navigation_agent = true
 
-[node name="NavBig1" parent="WorldActors" unique_id=1911799947 instance=ExtResource("6_qtbig")]
+[node name="NavBig1" type="CharacterBody2D" parent="WorldActors" unique_id=820817922 groups=["enemy"] instance=ExtResource("11_skmfj")]
 position = Vector2(356, 244)
+collision_layer = 4
+script = ExtResource("7_na3ov")
+stats = ExtResource("12_s5lvl")
 use_navigation_agent = true
 
-[node name="BaseballBatPickup" parent="WorldActors" unique_id=224259991 instance=ExtResource("6_63h0e")]
+[node name="BaseballBatPickup" type="Area2D" parent="WorldActors" unique_id=375026148 instance=ExtResource("13_l14po")]
 position = Vector2(259, 266)
-outline_color = Color(0.9812487, 0.89732003, 0.83248687, 1)
+collision_layer = 0
+collision_mask = 2
+script = ExtResource("14_lcqbh")
+weapon_data = ExtResource("15_2c37a")
 
-[node name="GunPickup" parent="WorldActors" unique_id=1855383143 instance=ExtResource("7_408im")]
+[node name="GunPickup" type="Area2D" parent="WorldActors" unique_id=241832659 instance=ExtResource("16_s7at2")]
 position = Vector2(101, 197)
+collision_layer = 0
+collision_mask = 2
+script = ExtResource("14_lcqbh")
+weapon_data = ExtResource("17_glpy8")
 
-[node name="WorldEffects" type="Node2D" parent="."]
+[node name="PistolPickup" type="Area2D" parent="WorldActors" unique_id=1687943354 instance=ExtResource("18_kofty")]
+position = Vector2(139, 197)
+collision_layer = 0
+collision_mask = 2
+script = ExtResource("14_lcqbh")
+weapon_data = ExtResource("19_ryxvi")
+
+[node name="ShotgunPickup" type="Area2D" parent="WorldActors" unique_id=1705277146 instance=ExtResource("20_81cml")]
+position = Vector2(177, 197)
+collision_layer = 0
+collision_mask = 2
+script = ExtResource("14_lcqbh")
+weapon_data = ExtResource("21_x5djv")
+
+[node name="WorldEffects" type="Node2D" parent="." unique_id=642539347]
 z_index = 50
 
-[node name="HighOverlay" type="Node2D" parent="."]
+[node name="HighOverlay" type="Node2D" parent="." unique_id=336499861]
 z_index = 100
+
+[node name="NavigationRegion2D" type="NavigationRegion2D" parent="." unique_id=1930610625]
+navigation_polygon = SubResource("NavigationPolygon_d8da0")
+
+[node name="Camera2D" type="Camera2D" parent="." unique_id=540987818]
+zoom = Vector2(2.5, 2.5)
+position_smoothing_enabled = true
+script = ExtResource("22_6m88s")
+target_path = NodePath("../WorldActors/Player")

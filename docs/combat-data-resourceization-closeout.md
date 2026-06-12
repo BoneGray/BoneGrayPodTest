@@ -89,7 +89,8 @@ hold_to_repeat_delay
 ## 运行时边界
 
 - `PlayerCombatController` 负责读取 `AttackProfile`，解释输入模式、阶段、冷却、伤害、命中帧、目标上限和攻击移动规则。
-- `Player` 主脚本仍负责场景节点操作，例如动画播放、`AttackArea2D` 开关、投射物/枪口火焰/弹壳生成、装备视觉同步。
+- `Player` 主脚本仍负责角色场景节点操作，例如动画播放、`AttackArea2D` 开关、装备视觉同步、发射起点和当前方向。
+- `FirearmController` 负责枪械投射物、枪口火焰、弹壳、弹丸散射和枪械 `hold_repeat` 保留/清理规则。`Player` 不应按单把枪名称写分支。
 - `EnemyCombatController` 负责敌人攻击选择权重、特殊攻击冷却、上下文权重、命中目标去重和伤害读取。
 - `BaseEnemy` 仍负责敌人场景节点操作、动画播放、移动、导航、攻击槽和特定攻击执行入口。
 
@@ -123,7 +124,8 @@ tools/validate_zombie_small_cross_attack.gd
 tools/validate_zombie_axe_setup.gd
 tools/validate_zombie_axe_owner_bound_pickup.gd
 tools/validate_navigation_obstacle_test_scene.gd
-tools/validate_main_scene_runtime.gd
+tools/validate_render_layer_baseline.gd
+tools/validate_firearm_controller_baseline.gd
 ```
 
 ## 第四步完成标准

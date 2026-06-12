@@ -177,6 +177,8 @@ hold_repeat
 拳头: tap_combo
 木棒: tap_combo
 自动步枪: hold_repeat
+手枪: hold_repeat
+散弹枪: hold_repeat
 E 键: 拾取/丢弃
 K 键: 暂时空置，什么都不做
 ```
@@ -187,7 +189,10 @@ K 键: 暂时空置，什么都不做
 - `tap_combo`：短按可以在后摇窗口内缓存下一次攻击，不因为长按自动重复。
 - `hold_repeat`：长按按冷却重复攻击，不使用短按后摇取消。
 - `tap_combo` 的节奏主要由动画帧、命中帧和后摇取消窗口控制；攻击动画自然结束后应清理 cooldown，避免长 cooldown 把玩家锁到无法再次攻击。
-- `hold_repeat` 的 cooldown 是持续触发频率控制，不能在单次动画结束时清掉。
+- `hold_repeat` 的 cooldown 是持续按住时的连发频率控制，不是点按后的硬锁时间。
+- `hold_repeat` 如果攻击键仍然按住，攻击动画结束后应保留 runtime cooldown，用它控制下一次自动触发。
+- `hold_repeat` 如果攻击键已经松开，攻击动画结束后应清理 runtime cooldown，让下一次点按可以立即重新开始。
+- 如果未来某把枪需要限制点按频率，应通过弹药、换弹、枪机、蓄力或单独的 fire-rate lock 资源规则表达，不要混用当前 runtime cooldown。
 
 当前手感规则：
 
@@ -196,6 +201,17 @@ K 键: 暂时空置，什么都不做
 木棒: 短按连击
 自动步枪: 长按连发
 攻击中: 允许减速移动
+```
+
+枪械行为基准：
+
+```text
+自动步枪是当前枪械运行时逻辑基准。
+手枪、散弹枪和后续新增枪械默认继承自动步枪的 hold_repeat 运行时规则。
+枪械攻击中允许减速移动，但默认锁定开火方向，不因移动输入改变当前射击方向。
+枪械移动中不能清掉长按连发计时。
+枪械差异优先放在 AttackProfile / WeaponData 数据里，例如伤害、冷却、弹丸数、散布、速度、生命周期、枪口偏移、弹壳偏移、换弹和弹药规则。
+如需某把枪允许转向射击、蓄力、点按限速或特殊装填，必须先作为显式玩法例外讨论，并写入资源字段或专门控制器，不能直接在 Player 主流程增加隐式分支。
 ```
 
 禁止规则：
@@ -325,6 +341,17 @@ AttackArea2D/CollisionShape2D.disabled
 攻击转向锁定
 ```
 
+cooldown 清理必须按输入模式区分：
+
+```text
+tap_combo: 动画自然结束后清理 runtime cooldown，避免长 cooldown 锁住短按连击手感。
+hold_repeat + 攻击键仍按住: 保留 runtime cooldown，用于控制连发间隔。
+hold_repeat + 攻击键已松开: 动画自然结束后清理 runtime cooldown，下一次点按可以重新开火。
+single_press: 是否保留 cooldown 取决于该武器是否设计为强节奏单发；需要在 AttackProfile 或后续 fire-rate 规则中明确。
+```
+
+`hold_repeat` 的输入计时属于“按住攻击键”的运行时状态，不能被移动动画切换清掉。玩家一边按住枪械攻击一边移动时，移动/行走流程只能改变移动表现，不能重置 `primary_attack_hold_time`、`primary_attack_repeat_ready` 或 `primary_attack_repeat_active`。
+
 移动开始必须确认：
 
 ```text
@@ -415,8 +442,30 @@ tools/validate_player_state_machine.gd
 tools/validate_player_attack_phases.gd
 tools/validate_repeat_attack_profile_generic.gd
 tools/validate_automatic_gun_fire.gd
+tools/validate_firearm_hold_repeat_all_weapons.gd
 tools/validate_player_drop_weapon.gd
 tools/validate_player_layered_weapon_visual.gd
+```
+
+## FirearmController 边界
+
+枪械运行时由 `scripts/player/firearm_controller.gd` 承接。`Player` 只负责读取当前 `AttackProfile`、进入攻击状态、提供角色当前方向、发射起点和装备视觉偏移，然后把投射物、枪口火光、弹壳、散射和枪械 `hold_repeat` 的保留/清理规则交给 `FirearmController`。
+
+规则：
+
+- `Player` 不允许为 `gun`、`pistol`、`shotgun` 或后续单把枪增加专属分支。
+- 枪械是否属于枪械运行时，由 `AttackProfile.attack_type = projectile` 或 `WeaponData.weapon_type = firearm` 判断。
+- 枪械差异必须优先写在 `AttackProfile` / `WeaponData` 数据里，例如伤害、冷却、弹丸数量、散射角、弹速、生命周期、枪口偏移、弹壳偏移、弹壳速度和后续弹药/换弹规则。
+- 如果某把枪需要不同于自动步枪基准的输入方式、转向规则、蓄力、装填或特殊射击，必须先作为显式玩法例外讨论，再新增资源字段或专门控制器，不要写进 `Player` 主流程。
+
+相关验证：
+
+```text
+tools/validate_firearm_controller_baseline.gd
+tools/validate_firearm_hold_repeat_all_weapons.gd
+tools/validate_automatic_gun_fire.gd
+tools/validate_pistol_weapon_logic.gd
+tools/validate_shotgun_weapon_logic.gd
 ```
 
 ## 第二步落地状态
@@ -441,17 +490,18 @@ tools/validate_player_layered_weapon_visual.gd
 
 - `AttackArea2D` 的节点开关、位置同步和重叠目标收集。
 - 对命中目标调用 `take_damage()` 和发出 `attack_hit` 信号。
-- 投射物、枪口火焰、弹壳等场景节点生成。
+- 枪械投射物、枪口火焰、弹壳等场景节点生成已委托给 `FirearmController`；`Player` 只提供发射起点、方向和装备视觉偏移。
 - 身体动画、手部/武器动画、层级和偏移同步。
 - 装备拾取、丢弃和手部资源切换。
 
-这些职责保留在主脚本里是当前阶段的有意选择，因为它们仍直接依赖场景节点和视觉层级。后续如果继续瘦身，应优先拆 `PlayerEquipmentController` 和 `PlayerVisualController`，而不是继续扩大 `PlayerCombatController`。
+这些职责保留在主脚本里是当前阶段的有意选择，因为它们仍直接依赖场景节点和视觉层级。后续如果继续瘦身，应优先拆 `PlayerEquipmentController` 和 `PlayerVisualController`，而不是继续扩大 `PlayerCombatController` 或重新把枪械特例写回 `Player`。
 
 当前已通过的核心验证：
 
 ```text
 tools/validate_repeat_attack_profile_generic.gd
 tools/validate_automatic_gun_fire.gd
+tools/validate_firearm_hold_repeat_all_weapons.gd
 tools/validate_player_state_machine.gd
 tools/validate_player_attack_target_limits.gd
 tools/validate_baseball_bat_pickup.gd
