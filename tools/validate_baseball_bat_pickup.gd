@@ -109,8 +109,8 @@ func _run() -> void:
 	if player.call("get_attack_power") != int(primary_attack.get("damage")):
 		_fail(root, "Equipped baseball bat should use primary AttackProfile damage.")
 		return
-	if absf(float(player.call("get_attack_cooldown", primary_attack)) - float(primary_attack.get("cooldown"))) > 0.001:
-		_fail(root, "Equipped baseball bat should use primary AttackProfile cooldown.")
+	if absf(float(player.call("get_attack_interval", primary_attack)) - float(primary_attack.get("manual_attack_lockout"))) > 0.001:
+		_fail(root, "Equipped baseball bat should use primary AttackProfile manual attack lockout.")
 		return
 
 	print("Baseball bat pickup is valid.")

@@ -12,8 +12,10 @@ class_name AttackProfile
 @export_group("Common")
 ## 本次攻击造成的基础伤害。值为 0 或更小时，回退使用武器或角色默认攻击力。
 @export var damage := 0
-## 本次攻击的冷却时间，单位为秒。值为 0 或更小时，回退使用武器或角色默认冷却。
-@export var cooldown := 0.0
+## 手动点按起手的最小间隔，单位为秒。值为 0 或更小时使用玩家默认手动间隔。
+@export var manual_attack_lockout := 0.0
+## 长按重复攻击的触发间隔，单位为秒。值为 0 或更小时使用玩家默认重复间隔。
+@export var repeat_attack_cooldown := 0.0
 ## 主攻击输入模式。single_press 只响应单次按下；tap_combo 使用短按缓存和后摇取消；hold_repeat 使用按住自动重复攻击。
 @export_enum("single_press", "tap_combo", "hold_repeat") var input_mode := "single_press"
 ## 按住攻击键是否持续重复触发。inherit 使用武器或空手默认值，enabled/disabled 用于单个攻击方式例外。
@@ -42,6 +44,12 @@ class_name AttackProfile
 @export var hit_frames: Array[int] = [2]
 ## 近战攻击最多命中的目标数量。值为 0 或更小时表示不限制。
 @export var max_targets := 1
+
+@export_group("Projectile Intercept")
+## 是否允许本次攻击拦截飞行中的可拦截投射物，例如木棒打落飞斧，或子弹击落飞斧。
+@export var can_intercept_projectile := false
+## 本次攻击拥有的拦截标签。飞行物的需求标签与这里任意一个标签匹配时，才允许拦截。
+@export var intercept_tags: PackedStringArray = []
 
 @export_group("Projectile")
 ## 弹丸攻击生成的弹丸场景。

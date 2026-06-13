@@ -8,7 +8,6 @@ profile_id = "baseball_bat_secondary"
 attack_type = "melee"
 animation_action = "attack_second"
 damage = 16
-cooldown = 0.45
 startup_frames = Array[int]([0, 1])
 active_frames = Array[int]([2])
 recovery_frames = Array[int]([3])

@@ -1,9 +1,15 @@
 extends CharacterBody2D
 
 const PSM = preload("res://scripts/player/player_state_machine.gd")
-const PIM = preload("res://scripts/player/player_input_map.gd")
 const PCC = preload("res://scripts/player/player_combat_controller.gd")
 const PFC = preload("res://scripts/player/firearm_controller.gd")
+const PIC = preload("res://scripts/characters/controllers/player_input_controller.gd")
+const ProjectileInterceptUtil = preload("res://scripts/combat/projectile_intercept.gd")
+
+const ATTACK_INTERVAL_MANUAL := "manual"
+const ATTACK_INTERVAL_REPEAT := "repeat"
+const DEFAULT_MANUAL_ATTACK_LOCKOUT := 0.35
+const DEFAULT_REPEAT_ATTACK_INTERVAL := 0.35
 
 signal attack_hit(target: Node)
 signal health_changed(current: int, maximum: int)
@@ -11,7 +17,7 @@ signal died(player: Node)
 signal weapon_equipped(weapon_data: Resource)
 
 @export_group("Stats")
-## 玩家属性资源，提供生命值、移动速度、防御、默认攻击力、攻击冷却和无敌时间。
+## 玩家属性资源，提供生命值、移动速度、防御、默认攻击力和无敌时间。
 @export var stats: Resource
 ## 没有 stats 或当前武器没有覆盖攻击力时使用的备用攻击力。
 @export var damage := 10
@@ -25,11 +31,6 @@ signal weapon_equipped(weapon_data: Resource)
 @export var unarmed_primary_attack_profile: Resource
 ## 空手副攻击配置。当前阶段暂不绑定输入，但保留给后续扩展。
 @export var unarmed_secondary_attack_profile: Resource
-## 空手默认是否允许按住攻击键持续重复触发。单个空手 AttackProfile 可用 repeat_mode 覆盖。
-@export var unarmed_repeat_while_held := true
-## 空手按住攻击键多久后进入持续连击，单位为秒。短按会立即攻击一次。
-@export var unarmed_hold_to_repeat_delay := 0.22
-
 @export_group("Control")
 ## 是否允许键盘控制。测试场景中可关闭，用于只播放动画或由脚本驱动。
 @export var keyboard_control_enabled := true
@@ -70,7 +71,7 @@ signal weapon_equipped(weapon_data: Resource)
 
 var current_direction := "side"
 var health := 1
-var attack_cooldown_remaining := 0.0
+var attack_lockout_remaining := 0.0
 var invincible_time_remaining := 0.0
 var stun_time_remaining := 0.0
 var _attack_active := false
@@ -88,9 +89,9 @@ var _current_attack_animation := ""
 var _primary_attack_repeat_active := false
 var _ignored_restarted_attack_animation := ""
 var _player_state_machine := PSM.new()
-var _input_map := PIM.new()
 var _combat_controller := PCC.new()
 var _firearm_controller := PFC.new()
+var _player_input_controller := PIC.new()
 var equipped_weapon: Resource
 
 var attack_hit_frames := {
@@ -117,9 +118,9 @@ func _ready() -> void:
 	_combat_controller.default_hit_frames = attack_hit_frames
 	_combat_controller.default_target_limits = attack_target_limits
 	_player_state_machine.reset(PSM.IDLE)
-	_input_map.primary_attack_key = primary_attack_key
-	_input_map.interact_key = interact_key
-	_input_map.unused_key = secondary_attack_key
+	_player_input_controller.primary_attack_key = primary_attack_key
+	_player_input_controller.interact_key = interact_key
+	_player_input_controller.unused_key = secondary_attack_key
 	health = get_max_health()
 	_body_visual_base_z_index = sprite.z_index
 	if hands_sprite != null:
@@ -167,6 +168,16 @@ func _return_to_locomotion_state() -> void:
 		return
 
 	var movement := _get_keyboard_movement()
+	if _is_firearm_hold_session_active():
+		var locked_direction := _get_firearm_hold_session_direction()
+		if movement == Vector2.ZERO:
+			_change_player_state(PSM.IDLE)
+			play_idle(locked_direction)
+		else:
+			_change_player_state(PSM.MOVE)
+			play_walk(locked_direction)
+		return
+
 	if movement == Vector2.ZERO:
 		_change_player_state(PSM.IDLE)
 		play_idle(current_direction)
@@ -208,7 +219,7 @@ func _cancel_startup_attack() -> void:
 
 
 func _physics_process(delta: float) -> void:
-	attack_cooldown_remaining = maxf(attack_cooldown_remaining - delta, 0.0)
+	attack_lockout_remaining = maxf(attack_lockout_remaining - delta, 0.0)
 	invincible_time_remaining = maxf(invincible_time_remaining - delta, 0.0)
 	stun_time_remaining = maxf(stun_time_remaining - delta, 0.0)
 	_refresh_state_from_lifecycle()
@@ -257,6 +268,12 @@ func _physics_process(delta: float) -> void:
 		_apply_active_attack_hits()
 		return
 
+	if _is_firearm_hold_session_active():
+		_apply_firearm_hold_session_movement()
+		move_and_slide()
+		_apply_active_attack_hits()
+		return
+
 	var movement := _get_keyboard_movement()
 	if movement == Vector2.ZERO:
 		velocity = Vector2.ZERO
@@ -275,12 +292,12 @@ func _physics_process(delta: float) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not keyboard_control_enabled or _player_state_machine.blocks_input():
 		return
-	if _input_map.is_unused_pressed(event):
-		return
-	if _input_map.is_interact_pressed(event):
+	_player_input_controller.apply_event(event)
+	var input_intent := _player_input_controller.build_intent()
+	if input_intent.interact_pressed:
 		_handle_interact_pressed()
 		return
-	if _input_map.is_primary_attack_pressed(event):
+	if input_intent.primary_attack_pressed:
 		_handle_primary_attack_pressed()
 
 
@@ -294,9 +311,11 @@ func _handle_interact_pressed() -> void:
 
 
 func play_idle(direction := current_direction) -> void:
+	direction = _get_firearm_hold_session_direction(direction)
 	current_direction = direction
 	if not _is_locked_animation():
-		_clear_attack_runtime_state()
+		if not _should_preserve_hold_repeat_input(_get_attack_profile("attack_first")):
+			_clear_attack_runtime_state()
 		_change_player_state(PSM.IDLE)
 	_play_animation_if_changed("idle_%s" % current_direction)
 
@@ -311,6 +330,7 @@ func _play_idle_animation_immediate(direction := current_direction) -> void:
 
 
 func play_walk(direction := current_direction) -> void:
+	direction = _get_firearm_hold_session_direction(direction)
 	current_direction = direction
 	if not _should_preserve_hold_repeat_input(_get_attack_profile("attack_first")):
 		_clear_attack_runtime_state()
@@ -318,11 +338,13 @@ func play_walk(direction := current_direction) -> void:
 	_play_animation_if_changed("walk_%s" % current_direction)
 
 
-func attack(action := "attack_first", direction := current_direction) -> void:
-	current_direction = direction
+func attack(action := "attack_first", direction := current_direction, interval_kind := ATTACK_INTERVAL_MANUAL) -> void:
 	var attack_profile := _get_attack_profile(action)
 	if equipped_weapon != null and attack_profile == null and action == "attack_second":
 		return
+	if _is_firearm_hold_session_active() and action == "attack_first":
+		direction = _get_firearm_hold_session_direction(direction)
+	current_direction = direction
 	action = _get_profile_animation_action(attack_profile, action)
 	var animation_name := _animation_name(action, current_direction)
 	if animation_player != null and animation_player.has_animation(animation_name):
@@ -336,7 +358,7 @@ func attack(action := "attack_first", direction := current_direction) -> void:
 	_sync_current_attack_debug_fields()
 	_change_player_state(PSM.ATTACK)
 	set_meta("current_attack_profile", attack_profile)
-	attack_cooldown_remaining = get_attack_cooldown(attack_profile)
+	attack_lockout_remaining = get_attack_interval(attack_profile, interval_kind)
 	set_meta("current_attack_action", action)
 	if attack_log_enabled:
 		print("%s 使用%s攻击，方向 %s" % [get_display_name(), _attack_key_label_for_action(action), current_direction])
@@ -358,7 +380,10 @@ func attack(action := "attack_first", direction := current_direction) -> void:
 func _begin_primary_attack() -> void:
 	_combat_controller.clear_primary_attack_input_state()
 	_sync_primary_attack_input_debug_fields()
-	attack("attack_first", current_direction)
+	var attack_profile := _get_attack_profile("attack_first")
+	if _should_use_firearm_hold_session(attack_profile):
+		_begin_firearm_hold_session(current_direction)
+	attack("attack_first", _get_firearm_hold_session_direction(current_direction))
 
 
 func _handle_primary_attack_pressed() -> void:
@@ -397,7 +422,7 @@ func _try_consume_buffered_primary_attack() -> bool:
 
 
 func _can_start_primary_attack_now() -> bool:
-	return keyboard_control_enabled and not _player_state_machine.blocks_attack() and not _is_locked_animation() and attack_cooldown_remaining <= 0.0
+	return keyboard_control_enabled and not _player_state_machine.blocks_attack() and not _is_locked_animation() and attack_lockout_remaining <= 0.0
 
 
 func _can_cancel_current_primary_attack() -> bool:
@@ -502,7 +527,7 @@ func _on_animation_finished() -> void:
 			var finished_attack_profile := _get_current_attack_profile()
 			_set_current_attack_phase(PCC.PHASE_FINISHED)
 			_clear_attack_runtime_state_after_animation(finished_attack_profile)
-			_clear_attack_cooldown_after_animation(finished_attack_profile)
+			_clear_attack_lockout_after_animation(finished_attack_profile)
 		else:
 			_set_attack_active(false)
 			_change_player_state(PSM.IDLE)
@@ -519,7 +544,7 @@ func _on_animation_player_finished(animation_name: StringName) -> void:
 			var finished_attack_profile := _get_current_attack_profile()
 			_set_current_attack_phase(PCC.PHASE_FINISHED)
 			_clear_attack_runtime_state_after_animation(finished_attack_profile)
-			_clear_attack_cooldown_after_animation(finished_attack_profile)
+			_clear_attack_lockout_after_animation(finished_attack_profile)
 		else:
 			_set_attack_active(false)
 			_change_player_state(PSM.IDLE)
@@ -534,12 +559,23 @@ func _set_attack_active(active: bool) -> void:
 
 
 func _apply_attack_hits() -> void:
+	var attack_profile := _get_current_attack_profile()
+	_apply_projectile_intercepts(attack_profile)
 	var max_targets := _get_current_attack_max_targets()
 	var hit_targets := _combat_controller.collect_new_hit_targets(_collect_attack_hit_targets(), max_targets)
 	for hit_target in hit_targets:
 		if hit_target.has_method("take_damage"):
 			hit_target.take_damage(get_attack_power())
 		attack_hit.emit(hit_target)
+
+
+func _apply_projectile_intercepts(attack_profile: Resource) -> void:
+	if attack_profile == null or not bool(attack_profile.get("can_intercept_projectile")):
+		return
+	for body in attack_area.get_overlapping_bodies():
+		ProjectileInterceptUtil.try_intercept(body, attack_profile, self)
+	for area in attack_area.get_overlapping_areas():
+		ProjectileInterceptUtil.try_intercept(area, attack_profile, self)
 
 
 func _apply_active_attack_hits() -> void:
@@ -587,6 +623,30 @@ func _clear_attack_runtime_state_after_animation(attack_profile: Resource) -> vo
 	_sync_primary_attack_input_debug_fields()
 
 
+func _should_use_firearm_hold_session(attack_profile: Resource) -> bool:
+	return _firearm_controller.can_use_hold_session(
+		attack_profile,
+		equipped_weapon,
+		_is_repeat_attack_enabled(attack_profile)
+	)
+
+
+func _begin_firearm_hold_session(direction_name: String) -> void:
+	_firearm_controller.begin_hold_session(direction_name)
+
+
+func _end_firearm_hold_session() -> void:
+	_firearm_controller.end_hold_session()
+
+
+func _is_firearm_hold_session_active() -> bool:
+	return _firearm_controller.is_hold_session_active()
+
+
+func _get_firearm_hold_session_direction(fallback_direction := current_direction) -> String:
+	return _firearm_controller.get_hold_session_direction(fallback_direction)
+
+
 func _should_preserve_hold_repeat_input(attack_profile: Resource) -> bool:
 	return _firearm_controller.should_preserve_hold_repeat_input(
 		attack_profile,
@@ -596,16 +656,16 @@ func _should_preserve_hold_repeat_input(attack_profile: Resource) -> bool:
 	)
 
 
-func _clear_attack_cooldown_after_animation(attack_profile: Resource) -> void:
+func _clear_attack_lockout_after_animation(attack_profile: Resource) -> void:
 	var input_mode := _get_attack_input_mode(attack_profile)
 	if input_mode == PCC.INPUT_TAP_COMBO:
-		attack_cooldown_remaining = 0.0
-	elif _firearm_controller.should_clear_cooldown_after_animation(
+		attack_lockout_remaining = 0.0
+	elif _firearm_controller.should_clear_lockout_after_animation(
 		attack_profile,
 		equipped_weapon,
 		_is_key_currently_pressed(primary_attack_key)
 	):
-		attack_cooldown_remaining = 0.0
+		attack_lockout_remaining = 0.0
 
 
 func _collect_attack_hit_targets() -> Array[Node]:
@@ -756,14 +816,14 @@ func _projectile_spawn_position() -> Vector2:
 
 func _try_repeat_held_attack() -> bool:
 	_sync_primary_attack_input_controller_from_debug_fields()
-	if not keyboard_control_enabled or is_stunned() or attack_cooldown_remaining > 0.0:
+	if not keyboard_control_enabled or is_stunned() or attack_lockout_remaining > 0.0:
 		return false
 	if _is_locked_animation() and not _can_repeat_during_locked_attack():
 		return false
 	if _combat_controller.is_primary_attack_repeat_ready() and _should_repeat_attack("attack_first"):
 		_combat_controller.set_primary_attack_repeat_active(true)
 		_sync_primary_attack_input_debug_fields()
-		attack("attack_first", current_direction)
+		attack("attack_first", _get_firearm_hold_session_direction(current_direction), ATTACK_INTERVAL_REPEAT)
 		return true
 	return false
 
@@ -785,7 +845,7 @@ func _can_repeat_during_locked_attack() -> bool:
 
 
 func _is_repeat_attack_enabled(attack_profile: Resource) -> bool:
-	return _combat_controller.is_repeat_attack_enabled(attack_profile, equipped_weapon, unarmed_repeat_while_held)
+	return _combat_controller.is_repeat_attack_enabled(attack_profile, equipped_weapon)
 
 
 func _is_holding_repeat_attack() -> bool:
@@ -796,6 +856,7 @@ func _is_holding_repeat_attack() -> bool:
 func _update_primary_attack_hold_state(delta: float) -> void:
 	_sync_primary_attack_input_controller_from_debug_fields()
 	if not _is_key_currently_pressed(primary_attack_key):
+		_end_firearm_hold_session()
 		if _combat_controller.primary_attack_repeat_active:
 			_cancel_primary_attack_repeat()
 		_combat_controller.clear_primary_attack_hold_state()
@@ -803,6 +864,7 @@ func _update_primary_attack_hold_state(delta: float) -> void:
 		return
 
 	if not _should_repeat_attack("attack_first"):
+		_end_firearm_hold_session()
 		_combat_controller.clear_primary_attack_hold_state()
 		_sync_primary_attack_input_debug_fields()
 		return
@@ -816,12 +878,12 @@ func _cancel_primary_attack_repeat() -> void:
 		if animation_player != null and animation_player.is_playing():
 			animation_player.stop()
 		_clear_attack_runtime_state()
-		attack_cooldown_remaining = 0.0
+		attack_lockout_remaining = 0.0
 		_return_to_locomotion_state()
 
 
 func _get_hold_to_repeat_delay(attack_profile: Resource) -> float:
-	return _combat_controller.get_hold_to_repeat_delay(attack_profile, equipped_weapon, unarmed_hold_to_repeat_delay)
+	return _combat_controller.get_hold_to_repeat_delay(attack_profile, 0.0)
 
 
 func _can_move_during_locked_attack() -> bool:
@@ -839,6 +901,18 @@ func _apply_locked_attack_movement() -> void:
 	if _can_turn_during_current_attack():
 		_turn_current_attack_to_direction(_direction_from_vector(movement))
 	velocity = movement.normalized() * get_move_speed() * attacking_move_speed_multiplier
+
+
+func _apply_firearm_hold_session_movement() -> void:
+	var locked_direction := _get_firearm_hold_session_direction(current_direction)
+	var movement := _get_keyboard_movement()
+	current_direction = locked_direction
+	if movement == Vector2.ZERO:
+		velocity = Vector2.ZERO
+		play_idle(locked_direction)
+		return
+	velocity = movement.normalized() * get_move_speed() * attacking_move_speed_multiplier
+	play_walk(locked_direction)
 
 
 func _turn_current_attack_to_movement_input() -> void:
@@ -974,11 +1048,12 @@ func drop_current_weapon() -> bool:
 
 	drop_parent.add_child(pickup)
 	pickup.global_position = global_position + _direction_vector_from_name(current_direction) * 18.0
-	pickup.set("weapon_data", equipped_weapon)
+	pickup.set("item_data", equipped_weapon)
 
 	equipped_weapon = null
+	_end_firearm_hold_session()
 	_clear_attack_runtime_state()
-	attack_cooldown_remaining = 0.0
+	attack_lockout_remaining = 0.0
 	clear_weapon_visual()
 	play_idle(current_direction)
 	weapon_equipped.emit(null)
@@ -988,7 +1063,7 @@ func drop_current_weapon() -> bool:
 func _try_pickup_nearby_weapon() -> bool:
 	var nearest_pickup: Node2D
 	var nearest_distance := INF
-	for pickup in get_tree().get_nodes_in_group("weapon_pickup"):
+	for pickup in get_tree().get_nodes_in_group("pickup_item"):
 		if not pickup.has_method("can_be_picked_by") or not pickup.can_be_picked_by(self):
 			continue
 		var pickup_2d := pickup as Node2D
@@ -1002,6 +1077,17 @@ func _try_pickup_nearby_weapon() -> bool:
 	if nearest_pickup == null or not nearest_pickup.has_method("pickup_by"):
 		return false
 	return bool(nearest_pickup.pickup_by(self))
+
+
+func pickup_item(item_data: Resource) -> bool:
+	if item_data == null:
+		return false
+	match String(item_data.get("item_type")):
+		"weapon":
+			equip_weapon(item_data)
+			return true
+		_:
+			return false
 
 
 func equip_weapon_visual(sprite_frames: SpriteFrames) -> void:
@@ -1045,6 +1131,7 @@ func die() -> void:
 
 	velocity = Vector2.ZERO
 	_change_player_state(PSM.DEAD)
+	_end_firearm_hold_session()
 	_clear_attack_runtime_state()
 	var death_animation := _animation_name("death_first", current_direction)
 	if sprite.sprite_frames != null and sprite.sprite_frames.has_animation(death_animation):
@@ -1112,8 +1199,9 @@ func apply_status_effect(effect_name: String, duration: float, _source: Node = n
 		stun_time_remaining = maxf(stun_time_remaining, duration)
 		velocity = Vector2.ZERO
 		_change_player_state(PSM.STUNNED)
+		_end_firearm_hold_session()
 		_clear_attack_runtime_state()
-		attack_cooldown_remaining = 0.0
+		attack_lockout_remaining = 0.0
 		_play_idle_animation_immediate(current_direction)
 
 
@@ -1135,7 +1223,7 @@ func get_defense() -> int:
 
 func get_attack_power() -> int:
 	var fallback_attack_power: int = stats.attack_power if stats != null else damage
-	return _combat_controller.get_attack_power(_get_current_attack_profile(), equipped_weapon, fallback_attack_power)
+	return _combat_controller.get_attack_power(_get_current_attack_profile(), fallback_attack_power)
 
 
 func _attack_key_label_for_action(action: String) -> String:
@@ -1146,13 +1234,13 @@ func _attack_key_label_for_action(action: String) -> String:
 	return action
 
 
-func get_attack_cooldown(attack_profile: Resource = null) -> float:
+func get_attack_interval(attack_profile: Resource = null, interval_kind := ATTACK_INTERVAL_MANUAL) -> float:
 	if attack_profile == null:
 		attack_profile = _get_attack_profile("attack_first")
-	var fallback_cooldown: float = stats.attack_cooldown if stats != null else 0.35
-	if attack_profile == _get_current_attack_profile():
-		return _combat_controller.get_attack_start_cooldown(attack_profile, equipped_weapon, fallback_cooldown)
-	return _combat_controller.get_attack_cooldown(attack_profile, equipped_weapon, fallback_cooldown)
+	var fallback_interval := DEFAULT_REPEAT_ATTACK_INTERVAL if interval_kind == ATTACK_INTERVAL_REPEAT else DEFAULT_MANUAL_ATTACK_LOCKOUT
+	if interval_kind == ATTACK_INTERVAL_REPEAT:
+		return _combat_controller.get_repeat_attack_cooldown(attack_profile, equipped_weapon, fallback_interval)
+	return _combat_controller.get_manual_attack_lockout(attack_profile, equipped_weapon, fallback_interval)
 
 
 func get_invincible_time() -> float:
@@ -1160,26 +1248,11 @@ func get_invincible_time() -> float:
 
 
 func _get_keyboard_movement() -> Vector2:
-	var movement := Vector2.ZERO
-	if Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT):
-		movement.x -= 1.0
-	if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT):
-		movement.x += 1.0
-	if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):
-		movement.y -= 1.0
-	if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):
-		movement.y += 1.0
-	return movement
+	return _player_input_controller.get_movement_vector()
 
 
 func _direction_from_vector(direction_vector: Vector2) -> String:
-	if absf(direction_vector.x) >= absf(direction_vector.y):
-		if direction_vector.x < 0.0:
-			return "side_left"
-		return "side"
-	if direction_vector.y < 0.0:
-		return "up"
-	return "down"
+	return _player_input_controller.direction_from_vector(direction_vector)
 
 
 func _is_key_pressed(event: InputEvent, key: int) -> bool:
@@ -1190,7 +1263,7 @@ func _is_key_pressed(event: InputEvent, key: int) -> bool:
 
 
 func _is_key_currently_pressed(key: int) -> bool:
-	return Input.is_key_pressed(key) or Input.is_physical_key_pressed(key)
+	return _player_input_controller.is_key_currently_pressed(key)
 
 
 func _is_locked_animation() -> bool:

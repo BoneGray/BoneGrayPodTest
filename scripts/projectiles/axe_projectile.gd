@@ -20,6 +20,14 @@ extends Area2D
 ## 命中墙体时从碰撞点向后退的距离，避免拾取物卡进墙体。
 @export var wall_landing_backoff := 6.0
 
+@export_group("Intercept")
+## 是否允许飞行中的斧子被可拦截攻击击落。斧子落地后不会继续参与拦截判断。
+@export var interceptable := true
+## 可以击落斧子的攻击标签，使用英文逗号分隔，例如 melee,bullet。
+@export var intercept_require_tags := "melee,bullet"
+## 拦截成功后的处理结果。当前版本只实现 drop_to_ground。
+@export var intercept_result := "drop_to_ground"
+
 @onready var sprite: AnimatedSprite2D = $Sprite
 @onready var collision_shape: CollisionShape2D = $CollisionShape2D
 
@@ -35,6 +43,7 @@ var has_landed := false
 
 
 func _ready() -> void:
+	add_to_group("interceptable_projectile")
 	body_entered.connect(_on_body_entered)
 	area_entered.connect(_on_area_entered)
 
@@ -87,6 +96,28 @@ func _try_hit(candidate: Node) -> void:
 		_land_against_wall()
 
 
+func get_intercept_require_tags() -> Array:
+	return _intercept_require_tags_array()
+
+
+func can_be_intercepted_by(attack_profile: Resource, _source: Node = null) -> bool:
+	if has_landed or not interceptable or attack_profile == null:
+		return false
+	if not bool(attack_profile.get("can_intercept_projectile")):
+		return false
+	return _has_matching_intercept_tag(_attack_intercept_tags(attack_profile), _intercept_require_tags_array())
+
+
+func intercept_projectile(attack_profile: Resource, source: Node = null) -> bool:
+	if not can_be_intercepted_by(attack_profile, source):
+		return false
+
+	set_meta("intercepted_by", source)
+	set_meta("intercept_result", intercept_result)
+	_land()
+	return true
+
+
 func _move_would_hit_wall(from: Vector2, to: Vector2) -> bool:
 	if blocked_by_mask <= 0:
 		return false
@@ -117,6 +148,36 @@ func _resolve_hit_target(candidate: Node) -> Node:
 			return current
 		current = current.get_parent()
 	return null
+
+
+func _intercept_require_tags_array() -> Array:
+	var tags := []
+	for tag in intercept_require_tags.split(",", false):
+		var normalized := String(tag).strip_edges()
+		if normalized != "":
+			tags.append(normalized)
+	return tags
+
+
+func _attack_intercept_tags(attack_profile: Resource) -> Array:
+	var tags := []
+	var configured_tags: Variant = attack_profile.get("intercept_tags")
+	if configured_tags is PackedStringArray:
+		for tag in configured_tags:
+			tags.append(String(tag))
+	elif configured_tags is Array:
+		for tag in configured_tags:
+			tags.append(String(tag))
+	return tags
+
+
+func _has_matching_intercept_tag(attack_tags: Array, required_tags: Array) -> bool:
+	if required_tags.is_empty():
+		return true
+	for tag in attack_tags:
+		if tag in required_tags:
+			return true
+	return false
 
 
 func _land() -> void:

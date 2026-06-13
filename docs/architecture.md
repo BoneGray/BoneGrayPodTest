@@ -35,6 +35,7 @@ CharacterBody2D
 +-- CombatController
 +-- EquipmentController 可选
 +-- Stats 或 CharacterDefinition
++-- Controller 可选，产出 CharacterIntent
 +-- Sprite / visual nodes
 +-- BodyCollisionShape2D
 +-- HitboxArea2D
@@ -49,8 +50,11 @@ CharacterBody2D
 - `CombatController` 负责攻击执行、命中窗口、伤害结算和战斗反馈。
 - `EquipmentController` 负责武器/工具的装备、卸下、拾取、丢弃和攻击配置来源。
 - `Stats` 或 `CharacterDefinition` 负责数据，不负责行为。
+- `Controller` 负责控制来源，例如玩家输入、敌人 AI 或脚本控制；它只产出 `CharacterIntent`，不直接改动画、伤害、碰撞或装备。
 
 当前代码不要求一次性拆完，但新增功能应朝这些边界迁移。
+
+如果一个需求需要“玩家控制敌人”或“AI 控制玩家”，应先参考 `docs/character-controller-refactor-design.md`，按 `Controller -> CharacterIntent -> CharacterActor` 的方向迁移，而不是为某个场景写专属输入或 AI 分支。
 
 ## 玩家状态标准
 
@@ -153,7 +157,7 @@ PickupArea2D          拾取范围
 ```text
 input_mode
 damage
-cooldown
+attack interval
 startup_frames
 active_frames
 recovery_frames

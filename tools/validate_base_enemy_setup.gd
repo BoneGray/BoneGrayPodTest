@@ -2,7 +2,7 @@
 extends SceneTree
 
 const ENEMY_SCENE_PATH := "res://scenes/characters/enemy.tscn"
-const ENEMY_TEST_SCENE_PATH := "res://scenes/enemy_test_scene.tscn"
+const ENEMY_TEST_SCENE_PATH := "res://scenes/navigation_obstacle_test_scene.tscn"
 const WORLD_COLLISION_LAYER := 1
 const ENEMY_BODY_LAYER := 4
 const PLAYER_HITBOX_LAYER := 8
@@ -139,10 +139,11 @@ func _validate_enemy_test_scene() -> bool:
 		return false
 
 	var root := scene.instantiate()
-	var player := root.get_node_or_null("Player") as CharacterBody2D
-	var enemies := root.find_children("Enemy*", "CharacterBody2D", false, false)
-	if root is Node2D and not (root as Node2D).y_sort_enabled:
-		push_error("Enemy test scene must enable Y Sort.")
+	var world_actors := root.get_node_or_null("WorldActors") as Node2D
+	var player := world_actors.get_node_or_null("Player") as CharacterBody2D if world_actors != null else null
+	var enemies := _find_enemy_bodies(root)
+	if world_actors == null or not world_actors.y_sort_enabled:
+		push_error("Navigation obstacle scene WorldActors must enable Y Sort.")
 		root.queue_free()
 		return false
 
@@ -152,9 +153,17 @@ func _validate_enemy_test_scene() -> bool:
 		return false
 
 	if enemies.size() < 3:
-		push_error("Enemy test scene should contain at least 3 enemies.")
+		push_error("Navigation obstacle scene should contain at least 3 enemies.")
 		root.queue_free()
 		return false
 
 	root.queue_free()
 	return true
+
+
+func _find_enemy_bodies(root: Node) -> Array:
+	var enemies := []
+	for body in root.find_children("*", "CharacterBody2D", true, false):
+		if body.is_in_group("enemy"):
+			enemies.append(body)
+	return enemies

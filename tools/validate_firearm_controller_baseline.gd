@@ -51,8 +51,8 @@ func _run() -> void:
 		if controller.should_preserve_hold_repeat_input(attack_profile, weapon_data, true, false):
 			_fail("FirearmController should not preserve repeat input after release: %s." % weapon_path)
 			return
-		if not controller.should_clear_cooldown_after_animation(attack_profile, weapon_data, false):
-			_fail("FirearmController should clear firearm cooldown after tap-release: %s." % weapon_path)
+		if not controller.should_clear_lockout_after_animation(attack_profile, weapon_data, false):
+			_fail("FirearmController should clear firearm lockout after tap-release: %s." % weapon_path)
 			return
 
 	print("FirearmController baseline is valid.")

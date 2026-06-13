@@ -33,7 +33,7 @@ func _run() -> void:
 		animation_player.stop()
 	player.call("_clear_attack_runtime_state")
 	player.call("play_idle", "down")
-	player.set("attack_cooldown_remaining", 0.0)
+	player.set("attack_lockout_remaining", 0.0)
 	await physics_frame
 
 	var start_position := player.global_position
@@ -49,7 +49,7 @@ func _run() -> void:
 	move_press.pressed = true
 	Input.parse_input_event(move_press)
 	for repeat_index in 4:
-		player.set("attack_cooldown_remaining", 0.0)
+		player.set("attack_lockout_remaining", 0.0)
 		player.set("_primary_attack_repeat_ready", true)
 		player.call("_try_repeat_held_attack")
 		await physics_frame

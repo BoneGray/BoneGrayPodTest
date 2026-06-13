@@ -1,7 +1,7 @@
 [gd_scene format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/characters/player.tscn" id="1_mrhly"]
-[ext_resource type="Script" path="res://scripts/zombie_big_attack_controller.gd" id="2_0wvrk"]
+[ext_resource type="Script" path="res://scripts/player/player.gd" id="2_0wvrk"]
 [ext_resource type="Resource" path="res://resources/characters/player/player_stats.tres" id="3_hyemf"]
 [ext_resource type="Resource" path="res://resources/equipment/weapons/unarmed/unarmed_primary_attack.tres" id="4_hsorm"]
 [ext_resource type="Resource" path="res://resources/equipment/weapons/unarmed/unarmed_secondary_attack.tres" id="5_hbx8k"]
@@ -13,7 +13,7 @@
 [ext_resource type="PackedScene" path="res://scenes/characters/enemy.tscn" id="11_skmfj"]
 [ext_resource type="Resource" path="res://resources/characters/enemies/zombie_big_stats.tres" id="12_s5lvl"]
 [ext_resource type="PackedScene" path="res://scenes/items/weapons/baseball_bat_pickup.tscn" id="13_l14po"]
-[ext_resource type="Script" path="res://scripts/items/weapon_pickup.gd" id="14_lcqbh"]
+[ext_resource type="Script" path="res://scripts/items/pickup_item.gd" id="14_lcqbh"]
 [ext_resource type="Resource" path="res://resources/equipment/weapons/baseball_bat/baseball_bat_data.tres" id="15_2c37a"]
 [ext_resource type="PackedScene" path="res://scenes/items/weapons/gun_pickup.tscn" id="16_s7at2"]
 [ext_resource type="Resource" path="res://resources/equipment/weapons/gun/gun_data.tres" id="17_glpy8"]
@@ -175,28 +175,28 @@ position = Vector2(259, 266)
 collision_layer = 0
 collision_mask = 2
 script = ExtResource("14_lcqbh")
-weapon_data = ExtResource("15_2c37a")
+item_data = ExtResource("15_2c37a")
 
 [node name="GunPickup" type="Area2D" parent="WorldActors" unique_id=241832659 instance=ExtResource("16_s7at2")]
 position = Vector2(101, 197)
 collision_layer = 0
 collision_mask = 2
 script = ExtResource("14_lcqbh")
-weapon_data = ExtResource("17_glpy8")
+item_data = ExtResource("17_glpy8")
 
 [node name="PistolPickup" type="Area2D" parent="WorldActors" unique_id=1687943354 instance=ExtResource("18_kofty")]
 position = Vector2(139, 197)
 collision_layer = 0
 collision_mask = 2
 script = ExtResource("14_lcqbh")
-weapon_data = ExtResource("19_ryxvi")
+item_data = ExtResource("19_ryxvi")
 
 [node name="ShotgunPickup" type="Area2D" parent="WorldActors" unique_id=1705277146 instance=ExtResource("20_81cml")]
 position = Vector2(177, 197)
 collision_layer = 0
 collision_mask = 2
 script = ExtResource("14_lcqbh")
-weapon_data = ExtResource("21_x5djv")
+item_data = ExtResource("21_x5djv")
 
 [node name="WorldEffects" type="Node2D" parent="." unique_id=642539347]
 z_index = 50

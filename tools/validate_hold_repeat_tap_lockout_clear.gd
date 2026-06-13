@@ -13,7 +13,7 @@ func _run() -> void:
 	var player_scene := load(PLAYER_SCENE_PATH) as PackedScene
 	var pistol_data := load(PISTOL_DATA_PATH) as Resource
 	if player_scene == null or pistol_data == null:
-		_fail(null, "Could not load hold-repeat cooldown dependencies.")
+		_fail(null, "Could not load hold-repeat lockout dependencies.")
 		return
 
 	var root := Node2D.new()
@@ -29,16 +29,16 @@ func _run() -> void:
 
 	var pistol_profile := pistol_data.get("primary_attack_profile") as Resource
 	if String(pistol_profile.get("input_mode")) != "hold_repeat":
-		_fail(root, "Pistol should use hold_repeat for this cooldown regression test.")
+		_fail(root, "Pistol should use hold_repeat for this lockout regression test.")
 		return
 
-	player.set("attack_cooldown_remaining", 10.0)
-	player.call("_clear_attack_cooldown_after_animation", pistol_profile)
-	if float(player.get("attack_cooldown_remaining")) > 0.0:
-		_fail(root, "Released hold-repeat tap should clear cooldown after animation finish.")
+	player.set("attack_lockout_remaining", 10.0)
+	player.call("_clear_attack_lockout_after_animation", pistol_profile)
+	if float(player.get("attack_lockout_remaining")) > 0.0:
+		_fail(root, "Released hold-repeat tap should clear lockout after animation finish.")
 		return
 
-	print("Hold-repeat tap cooldown clear is valid.")
+	print("Hold-repeat tap lockout clear is valid.")
 	root.queue_free()
 	quit()
 

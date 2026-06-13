@@ -47,11 +47,11 @@
 - 玩家主攻击输入由 `AttackProfile.input_mode` 决定，避免同一把武器同时混用点按、手动连按和长按连发。
 - `single_press` 表示按一次只攻击一次，不使用后摇取消，也不使用长按重复。
 - `tap_combo` 表示靠玩家手动连按接攻击，可以使用 `input_buffer_time` 和 `cancel_last_frames`，但按住攻击键不应自动重复。
-- `hold_repeat` 表示按住自动重复攻击，使用 `hold_to_repeat_delay` 和当前攻击 `cooldown`，但不使用短按缓存或后摇取消。
+- `hold_repeat` 表示按住自动重复攻击，使用 `hold_to_repeat_delay` 和当前攻击 `repeat_attack_cooldown`，但不使用短按缓存或后摇取消。
 - 短按后摇取消必须发生在命中帧之后，不能取消前摇或命中帧，避免破坏命中判定和可读性。
 - 玩家攻击运行时状态只能由 Player 攻击状态机统一维护；命中判定必须同时满足当前攻击 action、当前攻击动画和当前命中帧，不能只依赖 `AttackArea2D.monitoring` 或动画轨道残留值。
 - 新武器如果需要不同攻击手感，优先选择或新增清晰的 `input_mode`；不要在脚本里临时堆多套输入判断。
-- 自动武器通常使用 `hold_repeat` 和较短 `cooldown`，如不需要后摇取消，应将 `cancel_last_frames` 设为 `0`。
+- 自动武器通常使用 `hold_repeat` 和较短 `repeat_attack_cooldown`，如不需要后摇取消，应将 `cancel_last_frames` 设为 `0`。
 
 ## 2D 图层与排序约定
 
@@ -226,3 +226,9 @@ CharacterBody2D
 - 树冠、屋顶、天花板和天空遮挡属于 `HighOverlay`，固定覆盖在角色、装备、拾取物和飞行物之上。
 - 飞行中的子弹、斧子、枪口火光、命中特效属于 `WorldEffects`；落地或变成可拾取物后进入 `WorldActors`。
 - 角色内部的身体、头、手、武器、攻击特效只在角色根节点内部切换层级，不应靠高 `z_index` 压过世界物件。
+
+## 通用专业化开发入口
+
+- 后续涉及可复用系统、同类资源扩展、武器、工具、消耗品、敌人、角色、拾取物、攻击方式或渲染层级时，先参考 `docs/professional-game-development-guidelines.md`。
+- 新需求默认先抽象公共概念，再接入当前资源；不要为了当前单个资源写一次性专属逻辑。
+- 当前拾取系统基线是 `ItemData -> WeaponData` 和 `PickupItem.item_data`。新武器、工具、消耗品和弹药都应优先接入这条公共路径。

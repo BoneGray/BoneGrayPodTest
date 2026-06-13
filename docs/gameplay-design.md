@@ -31,7 +31,8 @@ Equipment should be split into weapon equipment and tool equipment.
 Weapon equipment controls combat output:
 
 - damage
-- cooldown
+- manual attack lockout
+- repeat attack interval
 - attack range
 - max hit targets
 - hit shape
@@ -45,7 +46,7 @@ Each weapon should choose one main input feel instead of mixing short press, tap
 
 - `single_press`: one press triggers one attack. This is suitable for handguns, slow tools, or weapons that should not combo.
 - `tap_combo`: repeated short presses can chain attacks through input buffering and recovery canceling. This is suitable for unarmed attacks, bats, knives, and other manual melee weapons.
-- `hold_repeat`: pressing once fires once, then holding repeats according to cooldown. This is suitable for automatic firearms.
+- `hold_repeat`: pressing once fires once, then holding repeats according to `repeat_attack_cooldown`. This is suitable for automatic firearms.
 
 Current player weapon input modes:
 
@@ -65,12 +66,27 @@ Tap combo rules:
 
 Hold repeat rules:
 
-- Firearms use `hold_repeat` as the unified input feel. Their differences should come from cooldown, damage, projectile count, spread, reload/ammo rules, and visual timing rather than separate input modes.
+- Firearms use `hold_repeat` as the unified input feel. Their differences should come from manual lockout, repeat interval, damage, projectile count, spread, reload/ammo rules, and visual timing rather than separate input modes.
 - The automatic gun is the current firearm behavior baseline. New firearms should inherit its runtime rules unless we explicitly design an exception: hold-repeat input, enabled repeat mode, slow movement during attack, locked firing direction, preserved hold timing while moving, and clean repeat-state cleanup after release.
-- Pistol and shotgun should differ from the automatic gun through data such as damage, cooldown, projectile count, projectile spread, projectile speed, lifetime, muzzle offsets, casing offsets, reload, and ammo rules, not through custom Player branches.
+- Pistol and shotgun should differ from the automatic gun through data such as damage, manual lockout, repeat interval, projectile count, projectile spread, projectile speed, lifetime, muzzle offsets, casing offsets, reload, and ammo rules, not through custom Player branches.
+
+## Projectile Intercept
+
+可被击落、格挡或偏转的飞行物统一按 `InterceptableProjectile` 思路处理，不为某一个敌人或某一把武器写专属分支。
+
+第一版规则：
+
+- 只有飞行中的投射物可以被拦截，落地后不再进入拦截流程。
+- 玩家攻击是否能拦截投射物由 `AttackProfile.can_intercept_projectile` 控制。
+- 攻击拥有的拦截分类写在 `AttackProfile.intercept_tags`，例如木棒为 `["melee", "bat"]`，枪械子弹为 `["bullet"]`。
+- 投射物接受哪些拦截分类由自身的 `intercept_require_tags` 控制，例如飞行斧子接受 `["melee", "bullet"]`。
+- 标签判断使用“任意交集即可”，这样后续可以扩展盾牌、大剑、魔法、爆炸等不同拦截类别。
+- 第一版拦截结果统一为 `drop_to_ground`：投射物取消伤害，停止飞行，生成落地物。
+- 近战拦截只能发生在攻击 Active / hit frame 中；枪械拦截由实际子弹碰撞触发。
+- 拦截逻辑必须通过共享 projectile intercept 路径，不允许在 Player、Axe 或某把武器里写名字特判。
 - `hold_to_repeat_delay` controls how long the player must hold before repeated attacks begin.
-- The repeated attack interval comes from the current attack `cooldown`.
-- For `hold_repeat` firearms, `cooldown` controls repeated fire while the attack key remains held. If the player only taps and releases, the completed firing animation should clear the runtime cooldown so the next tap can start cleanly.
+- The repeated attack interval comes from `repeat_attack_cooldown`. If that field is not configured, runtime uses the player default repeat interval; do not add legacy rhythm fallback fields to player weapons.
+- For `hold_repeat` firearms, `repeat_attack_cooldown` controls repeated fire while the attack key remains held. If the player only taps and releases, the completed firing animation should clear the runtime lockout so the next tap can start cleanly.
 - Hold repeat should not use short-press input buffering or recovery canceling.
 - Hold repeat is a temporary held-input state. Releasing the attack key should clear repeat state, cancel repeat-only animation lock, and restore normal movement speed and turning.
 - Automatic firearms should usually set `cancel_last_frames = 0`.
@@ -78,19 +94,49 @@ Hold repeat rules:
 Player weapon combat data should live on `AttackProfile` first:
 
 - `AttackProfile.damage` defines attack damage.
-- `AttackProfile.cooldown` defines attack cadence.
+- `AttackProfile.manual_attack_lockout` defines the minimum interval for manual press starts.
+- `AttackProfile.repeat_attack_cooldown` defines the interval for held repeat attacks.
 - `AttackProfile.input_mode` defines whether the weapon is `single_press`, `tap_combo`, or `hold_repeat`.
 - `AttackProfile.repeat_mode` and `hold_to_repeat_delay` define hold-repeat behavior when needed.
-- `AttackProfile.startup_frames`, `active_frames`, and `recovery_frames` define the attack phase timeline. If they are empty, runtime may derive phases from `hit_frames` for migration compatibility.
-- `AttackProfile.movement_rule` defines movement during attack. Current rules are `slow_locked_direction`, `slow_turn_to_input`, and `rooted`; `inherit` keeps the old input-mode-based fallback.
+- `AttackProfile.startup_frames`, `active_frames`, and `recovery_frames` define the attack phase timeline. New attacks should configure phases explicitly.
+- `AttackProfile.movement_rule` defines movement during attack. Current rules are `slow_locked_direction`, `slow_turn_to_input`, and `rooted`; `inherit` is only acceptable for unfinished prototype data and should be replaced before content is considered stable.
 - Projectile weapons may use `projectile_count` and `projectile_spread_degrees` to describe multi-pellet attacks such as shotguns. Weapon-specific spread should stay in data, not in hard-coded Player branches.
 - Firearm runtime behavior is centralized in `FirearmController`. Player should not branch by a specific firearm name; new firearm differences should be expressed through attack/equipment data first.
-- `WeaponData.attack_power`, `attack_cooldown`, `repeat_while_held`, and `hold_to_repeat_delay` are migration fallback fields only. New weapons should leave them at defaults and configure the attack profile instead.
+- `WeaponData` must not contain combat fallback fields such as `attack_power`, `repeat_while_held`, or `hold_to_repeat_delay`. Player weapon rhythm and damage belong in `AttackProfile`.
 - Fourth-step resourceization closeout is tracked in `docs/combat-data-resourceization-closeout.md`.
+
+Current player attack rhythm values:
+
+```text
+Unarmed:
+input_mode = tap_combo
+manual_attack_lockout = 0.12
+cancel_last_frames = 1
+
+Baseball bat:
+input_mode = tap_combo
+manual_attack_lockout = 0.28
+cancel_last_frames = 1
+
+Pistol:
+input_mode = hold_repeat
+manual_attack_lockout = 0.3
+repeat_attack_cooldown = 0.4
+
+Automatic gun:
+input_mode = hold_repeat
+manual_attack_lockout = 0.4
+repeat_attack_cooldown = 0.3
+
+Shotgun:
+input_mode = hold_repeat
+manual_attack_lockout = 0.65
+repeat_attack_cooldown = 0.8
+```
 
 Tool equipment controls active utility behavior:
 
-- cooldown
+- use interval
 - use count or durability
 - effect type
 - duration
@@ -124,7 +170,7 @@ Combat code should consume the result only:
 
 ```text
 damage
-cooldown
+attack rhythm interval
 range
 max targets
 attack shape
@@ -172,9 +218,9 @@ Current special attack decision:
 
 - The current enemy feel is treated as the `Normal` baseline: dangerous, readable enough, and close to the prototype feel that already plays well.
 - Enemy attack selection should be data-driven before adding Easy or Hard variants. The current baseline uses `attack_selection_order = "special_first"`, `default_attack_weight = 1.0`, `special_attack_weight_multiplier = 1.0`, and `melee_attack_weight_multiplier = 1.0`.
-- Enemy `attack_profiles` support both inline `Dictionary` profiles and `EnemyAttackProfile` resources. Runtime code converts both forms into the same dictionary shape before selection and execution.
+- Enemy `attack_profiles` should use `EnemyAttackProfile` resources for stable content. Inline dictionary profiles are not an approved path for new enemies.
 - Enemy attacks should prefer `.tres` resources once their rules are stable. Current resource-backed attacks include Big/Small default melee, Axe weapon melee, Axe no-weapon melee, Big heavy stun, Small cross, and Axe throw.
-- New enemy `attack_actions` should define an explicit `EnemyAttackProfile` resource by default. Inline `Dictionary` profiles are kept only as a migration fallback.
+- New enemy `attack_actions` must define an explicit `EnemyAttackProfile` resource by default. Inline `Dictionary` profiles should be removed when touched.
 - Existing Big / Small / Axe attack actions are resource-backed as of the fourth-step combat data resourceization closeout.
 - Individual attack profiles may use `selection_weight` to tune how often an available attack is selected. A weight of `0` disables selection without removing the profile.
 - Individual special attacks may use `special_cooldown` for independent cooldown. The enemy keeps runtime `last_used` data per action, so finishing the current animation does not clear special cooldown.

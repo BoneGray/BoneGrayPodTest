@@ -1,5 +1,7 @@
 extends Area2D
 
+const ProjectileInterceptUtil = preload("res://scripts/combat/projectile_intercept.gd")
+
 @export_group("Target")
 ## 子弹可命中的目标组名。玩家子弹通常命中 enemy。
 @export var target_group := "enemy"
@@ -84,6 +86,10 @@ func _on_area_entered(area: Area2D) -> void:
 
 
 func _try_hit(candidate: Node) -> void:
+	if ProjectileInterceptUtil.try_intercept(candidate, attack_profile, owner_node) != null:
+		queue_free()
+		return
+
 	var hit_target := _resolve_hit_target(candidate)
 	if hit_target == null or hit_target in _hit_targets:
 		return

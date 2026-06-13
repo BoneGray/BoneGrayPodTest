@@ -3,6 +3,9 @@ class_name FirearmController
 
 const PCC = preload("res://scripts/player/player_combat_controller.gd")
 
+var hold_session_active := false
+var hold_session_direction := "side"
+
 
 func is_firearm_profile(attack_profile: Resource, equipped_weapon: Resource) -> bool:
 	if attack_profile == null:
@@ -29,7 +32,7 @@ func should_preserve_hold_repeat_input(
 	return attack_key_pressed
 
 
-func should_clear_cooldown_after_animation(
+func should_clear_lockout_after_animation(
 	attack_profile: Resource,
 	equipped_weapon: Resource,
 	attack_key_pressed: bool
@@ -39,6 +42,35 @@ func should_clear_cooldown_after_animation(
 	if String(attack_profile.get("input_mode")) != PCC.INPUT_HOLD_REPEAT:
 		return false
 	return not attack_key_pressed
+
+
+func can_use_hold_session(
+	attack_profile: Resource,
+	equipped_weapon: Resource,
+	repeat_enabled: bool
+) -> bool:
+	if not is_firearm_profile(attack_profile, equipped_weapon):
+		return false
+	if String(attack_profile.get("input_mode")) != PCC.INPUT_HOLD_REPEAT:
+		return false
+	return repeat_enabled
+
+
+func begin_hold_session(direction_name: String) -> void:
+	hold_session_active = true
+	hold_session_direction = direction_name if direction_name != "" else "side"
+
+
+func end_hold_session() -> void:
+	hold_session_active = false
+
+
+func is_hold_session_active() -> bool:
+	return hold_session_active
+
+
+func get_hold_session_direction(fallback_direction := "side") -> String:
+	return hold_session_direction if hold_session_active else fallback_direction
 
 
 func execute_projectile_attack(

@@ -97,7 +97,7 @@ func _run() -> void:
 	for child in root.get_children():
 		if child == player:
 			continue
-		if child.get("weapon_data") == gun_data:
+		if child.get("item_data") == gun_data:
 			dropped_pickups += 1
 
 	if dropped_pickups != 1:

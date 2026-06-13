@@ -181,16 +181,12 @@ func collect_new_hit_targets(candidates: Array[Node], max_targets: int) -> Array
 	return new_hit_targets
 
 
-func get_attack_power(attack_profile: Resource, equipped_weapon: Resource, fallback_attack_power: int) -> int:
+func get_attack_power(attack_profile: Resource, fallback_attack_power: int) -> int:
 	if attack_profile != null:
 		var profile_damage := int(attack_profile.get("damage"))
 		if profile_damage > 0:
 			return profile_damage
 
-	if equipped_weapon != null:
-		var weapon_attack_power := int(equipped_weapon.get("attack_power"))
-		if weapon_attack_power > 0:
-			return weapon_attack_power
 	return fallback_attack_power
 
 
@@ -300,33 +296,25 @@ func get_attack_movement_rule(attack_profile: Resource, equipped_weapon: Resourc
 	return MOVEMENT_SLOW_LOCKED_DIRECTION
 
 
-func get_attack_cooldown(attack_profile: Resource, equipped_weapon: Resource, fallback_cooldown: float) -> float:
+func get_manual_attack_lockout(attack_profile: Resource, equipped_weapon: Resource, fallback_interval: float) -> float:
 	if attack_profile != null:
-		var profile_cooldown := float(attack_profile.get("cooldown"))
-		if profile_cooldown > 0.0:
-			return profile_cooldown
+		var manual_lockout := float(attack_profile.get("manual_attack_lockout"))
+		if manual_lockout > 0.0:
+			return manual_lockout
 
-	if equipped_weapon != null:
-		var fallback_weapon_attack_cooldown := float(equipped_weapon.get("attack_cooldown"))
-		if fallback_weapon_attack_cooldown > 0.0:
-			return fallback_weapon_attack_cooldown
-	return fallback_cooldown
+	return fallback_interval
 
 
-func get_attack_start_cooldown(attack_profile: Resource, equipped_weapon: Resource, fallback_cooldown: float) -> float:
+func get_repeat_attack_cooldown(attack_profile: Resource, equipped_weapon: Resource, fallback_interval: float) -> float:
 	if attack_profile != null:
-		var profile_cooldown := float(attack_profile.get("cooldown"))
-		if profile_cooldown > 0.0:
-			return profile_cooldown
+		var repeat_cooldown := float(attack_profile.get("repeat_attack_cooldown"))
+		if repeat_cooldown > 0.0:
+			return repeat_cooldown
 
-	if equipped_weapon != null:
-		var weapon_attack_cooldown := float(equipped_weapon.get("attack_cooldown"))
-		if weapon_attack_cooldown > 0.0:
-			return weapon_attack_cooldown
-	return fallback_cooldown
+	return fallback_interval
 
 
-func is_repeat_attack_enabled(attack_profile: Resource, equipped_weapon: Resource, unarmed_repeat_while_held: bool) -> bool:
+func is_repeat_attack_enabled(attack_profile: Resource, equipped_weapon: Resource) -> bool:
 	if attack_profile == null:
 		return false
 
@@ -337,18 +325,14 @@ func is_repeat_attack_enabled(attack_profile: Resource, equipped_weapon: Resourc
 		return false
 	if get_attack_input_mode(attack_profile, equipped_weapon) == INPUT_HOLD_REPEAT:
 		return true
-	if equipped_weapon != null:
-		return bool(equipped_weapon.get("repeat_while_held"))
-	return unarmed_repeat_while_held
+	return false
 
 
-func get_hold_to_repeat_delay(attack_profile: Resource, equipped_weapon: Resource, fallback_delay: float) -> float:
+func get_hold_to_repeat_delay(attack_profile: Resource, fallback_delay: float) -> float:
 	if attack_profile != null:
 		var profile_delay := float(attack_profile.get("hold_to_repeat_delay"))
 		if profile_delay >= 0.0:
 			return profile_delay
-	if equipped_weapon != null:
-		return maxf(float(equipped_weapon.get("hold_to_repeat_delay")), 0.0)
 	return maxf(fallback_delay, 0.0)
 
 

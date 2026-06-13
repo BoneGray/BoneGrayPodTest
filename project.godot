@@ -11,7 +11,7 @@ config_version=5
 [application]
 
 config/name="GameZombieWorld"
-run/main_scene="uid://b60b21w0lwxke"
+run/main_scene="res://scenes/navigation_obstacle_test_scene.tscn"
 config/features=PackedStringArray("4.6", "Forward Plus")
 
 [autoload]

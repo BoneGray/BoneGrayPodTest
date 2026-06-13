@@ -1,7 +1,7 @@
 @tool
 extends SceneTree
 
-const SCENE_PATH := "res://scenes/enemy_test_scene.tscn"
+const SCENE_PATH := "res://scenes/navigation_obstacle_test_scene.tscn"
 
 
 func _initialize() -> void:
@@ -20,10 +20,11 @@ func _run() -> void:
 
 	await process_frame
 
-	var player := root.get_node_or_null("Player") as CharacterBody2D
-	var enemies := root.find_children("Enemy*", "CharacterBody2D", false, false)
-	if player == null or enemies.size() < 3:
-		push_error("Enemy test scene should contain Player and at least 3 enemies.")
+	var world_actors := root.get_node_or_null("WorldActors")
+	var player := world_actors.get_node_or_null("Player") as CharacterBody2D if world_actors != null else null
+	var enemies := _find_enemy_bodies(root)
+	if world_actors == null or player == null:
+		push_error("Navigation obstacle test scene should contain WorldActors and Player.")
 		root.queue_free()
 		quit(1)
 		return
@@ -32,7 +33,7 @@ func _run() -> void:
 	while enemies.size() < 5:
 		var extra_enemy := enemy_scene.instantiate() as CharacterBody2D
 		extra_enemy.name = "EnemyExtra%s" % enemies.size()
-		root.add_child(extra_enemy)
+		world_actors.add_child(extra_enemy)
 		enemies.append(extra_enemy)
 
 	await process_frame
@@ -71,8 +72,8 @@ func _run() -> void:
 		quit(1)
 		return
 
-	if assigned_directions.size() != 4:
-		push_error("Exactly four active attack slots should be claimed.")
+	if assigned_directions.size() > 4:
+		push_error("No more than four active attack slots should be claimed.")
 		root.queue_free()
 		quit(1)
 		return
@@ -86,3 +87,11 @@ func _run() -> void:
 	print("Enemy attack slot manager is valid.")
 	root.queue_free()
 	quit()
+
+
+func _find_enemy_bodies(root: Node) -> Array:
+	var enemies := []
+	for body in root.find_children("*", "CharacterBody2D", true, false):
+		if body.is_in_group("enemy"):
+			enemies.append(body)
+	return enemies

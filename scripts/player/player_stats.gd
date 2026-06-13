@@ -16,8 +16,6 @@ class_name PlayerStats
 @export_group("Attack")
 ## 默认攻击力。当当前武器没有覆盖攻击力时使用。
 @export var attack_power := 10
-## 默认攻击冷却时间，单位为秒。当当前武器没有覆盖冷却时使用。
-@export var attack_cooldown := 0.35
 
 @export_group("Damage")
 ## 受伤后的无敌时间，单位为秒，用于避免短时间内连续吃到多次伤害。
