@@ -24,6 +24,9 @@ var primary_attack_held: bool = false
 ## True only on the frame the interaction input is pressed.
 var interact_pressed: bool = false
 
+## True only on the frame the reload input is pressed.
+var reload_pressed: bool = false
+
 ## Optional target for AI or scripted controllers.
 var target: Node2D = null
 
@@ -38,6 +41,7 @@ func clear() -> void:
 	primary_attack_pressed = false
 	primary_attack_held = false
 	interact_pressed = false
+	reload_pressed = false
 	target = null
 	requested_action = ""
 

@@ -1,5 +1,26 @@
 # Player Refactor Design
 
+## Firearm Reload State
+
+枪械换弹属于独立的 Player 主状态，不属于 Attack 阶段。
+
+当前规则：
+
+- `Reload` 状态允许从 `Idle`、`Move`、`Attack` 进入。
+- `Reload` 状态禁止开火和拾取交互。
+- `Reload` 状态允许按武器配置减速移动，身体播放 idle/walk，手部/武器层播放 `reload_<direction>`。
+- 换弹时间由手部/武器层 SpriteFrames 中对应 `reload_<direction>` 动画帧数和速度计算。
+- 当前阶段保留无限备弹，只管理弹匣内子弹数。
+- `WeaponData.magazine_size` 定义弹匣容量，`FirearmController` 持有运行时弹匣和换弹状态。
+- `Stunned`、`Dead`、丢弃或移除武器必须打断换弹。
+- 新枪械必须通过共享 reload 流程验证，不允许在 Player 中按单把枪写换弹分支。
+- `R` 是枪械手动换弹键；只有当前武器是枪械、弹匣未满、且没有处于死亡/眩晕/换弹时才响应。
+- `Attack` 中按 `R` 不立即打断当前射击，而是缓存换弹请求；当前攻击动画结束并清理命中窗口后，再进入 `Reload`。
+- 如果换弹前属于 `hold_repeat` 枪械连发语义，并且换弹完成时玩家仍按住 `J`，则恢复连发并沿用换弹前锁定的射击方向。
+- 如果换弹来自普通点按，或者换弹完成前玩家松开 `J`，则回到 `Idle` 或 `Move`，不自动开火。
+- `Stunned`、`Dead`、丢弃武器或切换武器必须同时清理换弹状态和换弹后的连发恢复意图。
+- 新枪械只能通过 `WeaponData` 和 `AttackProfile` 接入共享换弹流程，不允许在 `Player` 里按单把枪写换弹分支。
+
 本文件定义 `Player` 第一阶段重构的目标、边界和执行顺序。当前阶段只做设计约束，不直接要求一次性拆完所有代码。
 
 ## 重构目标

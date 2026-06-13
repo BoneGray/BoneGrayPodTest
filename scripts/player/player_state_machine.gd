@@ -4,6 +4,7 @@ class_name PlayerStateMachine
 const IDLE := "idle"
 const MOVE := "move"
 const ATTACK := "attack"
+const RELOAD := "reload"
 const PICKUP := "pickup"
 const STUNNED := "stunned"
 const DEAD := "dead"
@@ -29,11 +30,13 @@ func can_change_to(next_state: String) -> bool:
 
 	match current_state:
 		IDLE:
-			return next_state in [MOVE, ATTACK, PICKUP]
+			return next_state in [MOVE, ATTACK, RELOAD, PICKUP]
 		MOVE:
-			return next_state in [IDLE, ATTACK]
+			return next_state in [IDLE, ATTACK, RELOAD]
 		ATTACK:
-			return next_state in [IDLE, MOVE, STUNNED, DEAD]
+			return next_state in [IDLE, MOVE, RELOAD, STUNNED, DEAD]
+		RELOAD:
+			return next_state in [IDLE, MOVE, ATTACK, STUNNED, DEAD]
 		PICKUP:
 			return next_state in [IDLE, MOVE, STUNNED, DEAD]
 		STUNNED:
@@ -59,8 +62,8 @@ func blocks_input() -> bool:
 
 
 func blocks_attack() -> bool:
-	return current_state in [PICKUP, STUNNED, DEAD]
+	return current_state in [RELOAD, PICKUP, STUNNED, DEAD]
 
 
 func blocks_interaction() -> bool:
-	return current_state in [ATTACK, STUNNED, DEAD]
+	return current_state in [ATTACK, RELOAD, STUNNED, DEAD]

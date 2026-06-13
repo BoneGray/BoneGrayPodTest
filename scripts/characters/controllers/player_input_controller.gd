@@ -9,6 +9,9 @@ var primary_attack_key := KEY_J
 ## Interaction key. Current project default is E for pickup and drop.
 var interact_key := KEY_E
 
+## Reload key. Current project default is R for firearm reload.
+var reload_key := KEY_R
+
 ## Reserved key. Current project keeps K empty and ignores it.
 var unused_key := KEY_K
 
@@ -26,6 +29,7 @@ var move_down_keys: Array[int] = [KEY_S, KEY_DOWN]
 
 var _primary_attack_pressed_this_frame := false
 var _interact_pressed_this_frame := false
+var _reload_pressed_this_frame := false
 
 
 func apply_event(event: InputEvent) -> void:
@@ -39,6 +43,9 @@ func apply_event(event: InputEvent) -> void:
 		return
 	if _matches_key(key_event, interact_key):
 		_interact_pressed_this_frame = true
+		return
+	if _matches_key(key_event, reload_key):
+		_reload_pressed_this_frame = true
 
 
 func build_intent(clear_frame_flags := true) -> RefCounted:
@@ -46,7 +53,8 @@ func build_intent(clear_frame_flags := true) -> RefCounted:
 		get_movement_vector(),
 		_primary_attack_pressed_this_frame,
 		is_key_currently_pressed(primary_attack_key),
-		_interact_pressed_this_frame
+		_interact_pressed_this_frame,
+		_reload_pressed_this_frame
 	)
 	if clear_frame_flags:
 		clear_frame_flags()
@@ -57,7 +65,8 @@ func build_intent_from_values(
 		move_vector: Vector2,
 		primary_attack_pressed: bool,
 		primary_attack_held: bool,
-		interact_pressed: bool
+		interact_pressed: bool,
+		reload_pressed: bool = false
 ) -> RefCounted:
 	var intent := CharacterIntentScript.new()
 	intent.source = CharacterIntentScript.SOURCE_PLAYER_INPUT
@@ -66,6 +75,7 @@ func build_intent_from_values(
 	intent.primary_attack_pressed = primary_attack_pressed
 	intent.primary_attack_held = primary_attack_held
 	intent.interact_pressed = interact_pressed
+	intent.reload_pressed = reload_pressed
 	return intent
 
 
@@ -97,6 +107,7 @@ func direction_from_vector(direction_vector: Vector2) -> String:
 func clear_frame_flags() -> void:
 	_primary_attack_pressed_this_frame = false
 	_interact_pressed_this_frame = false
+	_reload_pressed_this_frame = false
 
 
 func any_key_currently_pressed(keys: Array[int]) -> bool:

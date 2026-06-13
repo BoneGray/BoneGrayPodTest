@@ -70,6 +70,33 @@ Hold repeat rules:
 - The automatic gun is the current firearm behavior baseline. New firearms should inherit its runtime rules unless we explicitly design an exception: hold-repeat input, enabled repeat mode, slow movement during attack, locked firing direction, preserved hold timing while moving, and clean repeat-state cleanup after release.
 - Pistol and shotgun should differ from the automatic gun through data such as damage, manual lockout, repeat interval, projectile count, projectile spread, projectile speed, lifetime, muzzle offsets, casing offsets, reload, and ammo rules, not through custom Player branches.
 
+Firearm reload rules:
+
+- Current prototype uses infinite reserve ammo and finite magazines only.
+- Magazine capacity belongs to `WeaponData.magazine_size`, not to Player branches.
+- Current magazine ammo is runtime state owned by `FirearmController`.
+- Firing consumes one magazine ammo per trigger, including shotgun shots.
+- `R` manually reloads the current firearm when the magazine is not full.
+- Pressing attack with an empty magazine starts reload when `auto_reload_when_empty = true`.
+- Reload duration comes from the equipped weapon visual `reload_<direction>` animation length.
+- Reload is a Player state. It blocks firing, allows configured slow movement, and can be interrupted by stun, death, or weapon removal.
+- If reload is requested during an active shot, the current shot is allowed to finish, then reload starts before returning to idle or move.
+- If `R` is pressed during a locked firearm shot before the magazine has become reloadable, the reload request is buffered and rechecked after that shot finishes. This prevents fast firearms from dropping reload input between shots.
+- Pending reload has priority over the next automatic repeat shot. Very fast firearms may restart their shooting animation before it naturally finishes, so reload buffering must also be consumed before repeat fire starts, not only from animation-finished callbacks.
+- If reload interrupts a `hold_repeat` firearm session and the player is still holding `J` when reload finishes, firing resumes automatically with the pre-reload locked fire direction.
+- Reload completion may transition directly into `Attack` when it resumes a held firearm session; this is part of the shared firearm flow, not a weapon-specific branch.
+- If reload came from a tap or the player released `J`, reload ends back to idle or move and does not auto-fire.
+- Stun, death, weapon drop, or weapon switch clears reload resume intent.
+- If a firearm has no reload animation for the current direction, the first prototype fallback is an immediate refill; missing reload resources should be tracked as content debt.
+
+Current firearm magazines:
+
+```text
+Automatic gun: 30
+Pistol: 15
+Shotgun: 8
+```
+
 ## Projectile Intercept
 
 可被击落、格挡或偏转的飞行物统一按 `InterceptableProjectile` 思路处理，不为某一个敌人或某一把武器写专属分支。

@@ -26,3 +26,13 @@ class_name WeaponData
 @export var primary_attack_profile: Resource
 ## Secondary attack profile reserved for future weapon-specific actions.
 @export var secondary_attack_profile: Resource
+
+@export_group("Firearm")
+## Number of shots available before a firearm must reload. Values of 0 or less mean the weapon does not use a magazine.
+@export var magazine_size := 0
+## Whether pressing attack with an empty magazine should start reloading automatically.
+@export var auto_reload_when_empty := true
+## Whether the player can move while this firearm is reloading.
+@export var can_move_while_reloading := true
+## Movement speed multiplier while this firearm reloads.
+@export_range(0.0, 1.0, 0.05) var reload_move_speed_multiplier := 0.45

@@ -39,6 +39,8 @@ func _run() -> void:
 
 	var interact_intent := controller.build_intent_from_values(Vector2.ZERO, false, false, true)
 	_assert_equal(interact_intent.interact_pressed, true, "interact pressed")
+	var reload_intent := controller.build_intent_from_values(Vector2.ZERO, false, false, false, true)
+	_assert_equal(reload_intent.reload_pressed, true, "reload pressed")
 
 	var attack_event := InputEventKey.new()
 	attack_event.keycode = KEY_J
@@ -59,6 +61,14 @@ func _run() -> void:
 	var unused_intent := controller.build_intent(false)
 	_assert_equal(unused_intent.primary_attack_pressed, false, "unused key attack")
 	_assert_equal(unused_intent.interact_pressed, false, "unused key interact")
+
+	var reload_event := InputEventKey.new()
+	reload_event.keycode = KEY_R
+	reload_event.physical_keycode = KEY_R
+	reload_event.pressed = true
+	controller.apply_event(reload_event)
+	var reload_event_intent := controller.build_intent(false)
+	_assert_equal(reload_event_intent.reload_pressed, true, "event reload pressed")
 
 	print("PlayerInputController baseline is valid.")
 	quit()

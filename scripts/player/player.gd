@@ -42,6 +42,8 @@ signal weapon_equipped(weapon_data: Resource)
 @export var primary_attack_key := KEY_J
 ## 拾取/丢弃交互键，默认 E。
 @export var interact_key := KEY_E
+## 枪械换弹键，默认 R。
+@export var reload_key := KEY_R
 ## 暂时空置的旧副攻击键。当前阶段 K 不执行任何功能。
 @export var secondary_attack_key := KEY_K
 
@@ -93,6 +95,10 @@ var _combat_controller := PCC.new()
 var _firearm_controller := PFC.new()
 var _player_input_controller := PIC.new()
 var equipped_weapon: Resource
+var _firearm_reload_buffered := false
+var _firearm_reload_resume_hold_repeat := false
+var _firearm_reload_resume_direction := ""
+var _firearm_reload_resume_weapon: Resource = null
 
 var attack_hit_frames := {
 	"attack_first": [2],
@@ -120,6 +126,7 @@ func _ready() -> void:
 	_player_state_machine.reset(PSM.IDLE)
 	_player_input_controller.primary_attack_key = primary_attack_key
 	_player_input_controller.interact_key = interact_key
+	_player_input_controller.reload_key = reload_key
 	_player_input_controller.unused_key = secondary_attack_key
 	health = get_max_health()
 	_body_visual_base_z_index = sprite.z_index
@@ -139,6 +146,9 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
+	if _is_firearm_reloading():
+		_sync_reload_visual()
+		return
 	_sync_equipment_visual_to_sprite()
 	_apply_equipment_visual_layer(String(sprite.animation))
 
@@ -153,6 +163,9 @@ func _refresh_state_from_lifecycle() -> void:
 		return
 	if stun_time_remaining > 0.0:
 		_change_player_state(PSM.STUNNED)
+		return
+	if _is_firearm_reloading():
+		_change_player_state(PSM.RELOAD)
 		return
 	if _player_state_machine.is_state(PSM.STUNNED):
 		_change_player_state(PSM.IDLE)
@@ -225,6 +238,10 @@ func _physics_process(delta: float) -> void:
 	_refresh_state_from_lifecycle()
 	_update_primary_attack_buffer(delta)
 	_update_primary_attack_hold_state(delta)
+	if _update_firearm_reload(delta):
+		move_and_slide()
+		_apply_active_attack_hits()
+		return
 	if _try_cancel_startup_attack_for_turn():
 		move_and_slide()
 		return
@@ -274,6 +291,12 @@ func _physics_process(delta: float) -> void:
 		_apply_active_attack_hits()
 		return
 
+	if _is_firearm_reloading():
+		_apply_firearm_reload_movement()
+		move_and_slide()
+		_apply_active_attack_hits()
+		return
+
 	var movement := _get_keyboard_movement()
 	if movement == Vector2.ZERO:
 		velocity = Vector2.ZERO
@@ -294,6 +317,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	_player_input_controller.apply_event(event)
 	var input_intent := _player_input_controller.build_intent()
+	if input_intent.reload_pressed:
+		_handle_reload_pressed()
+		return
 	if input_intent.interact_pressed:
 		_handle_interact_pressed()
 		return
@@ -308,6 +334,20 @@ func _handle_interact_pressed() -> void:
 		_try_pickup_nearby_weapon()
 	else:
 		drop_current_weapon()
+
+
+func _handle_reload_pressed() -> void:
+	if not keyboard_control_enabled or _player_state_machine.blocks_input():
+		return
+	if _is_firearm_reloading() or not _firearm_controller.is_magazine_enabled(equipped_weapon):
+		return
+	var reload_direction := _get_firearm_hold_session_direction(current_direction)
+	if _player_state_machine.is_state(PSM.ATTACK) or _is_locked_animation():
+		_buffer_firearm_reload(reload_direction, true)
+		return
+	if not _firearm_controller.can_manual_reload(equipped_weapon):
+		return
+	_try_start_firearm_reload(reload_direction, true, _should_restore_hold_repeat_after_reload())
 
 
 func play_idle(direction := current_direction) -> void:
@@ -342,6 +382,10 @@ func attack(action := "attack_first", direction := current_direction, interval_k
 	var attack_profile := _get_attack_profile(action)
 	if equipped_weapon != null and attack_profile == null and action == "attack_second":
 		return
+	if action == "attack_first" and _get_profile_attack_type(attack_profile) == PCC.ATTACK_TYPE_PROJECTILE:
+		if not _firearm_controller.can_fire(equipped_weapon):
+			_try_start_firearm_reload(direction, false, _should_restore_hold_repeat_after_reload())
+			return
 	if _is_firearm_hold_session_active() and action == "attack_first":
 		direction = _get_firearm_hold_session_direction(direction)
 	current_direction = direction
@@ -381,6 +425,9 @@ func _begin_primary_attack() -> void:
 	_combat_controller.clear_primary_attack_input_state()
 	_sync_primary_attack_input_debug_fields()
 	var attack_profile := _get_attack_profile("attack_first")
+	if _get_profile_attack_type(attack_profile) == PCC.ATTACK_TYPE_PROJECTILE and not _firearm_controller.can_fire(equipped_weapon):
+		_try_start_firearm_reload(current_direction, false, _should_restore_hold_repeat_after_reload())
+		return
 	if _should_use_firearm_hold_session(attack_profile):
 		_begin_firearm_hold_session(current_direction)
 	attack("attack_first", _get_firearm_hold_session_direction(current_direction))
@@ -422,7 +469,7 @@ func _try_consume_buffered_primary_attack() -> bool:
 
 
 func _can_start_primary_attack_now() -> bool:
-	return keyboard_control_enabled and not _player_state_machine.blocks_attack() and not _is_locked_animation() and attack_lockout_remaining <= 0.0
+	return keyboard_control_enabled and not _player_state_machine.blocks_attack() and not _is_locked_animation() and not _is_firearm_reloading() and attack_lockout_remaining <= 0.0
 
 
 func _can_cancel_current_primary_attack() -> bool:
@@ -528,6 +575,8 @@ func _on_animation_finished() -> void:
 			_set_current_attack_phase(PCC.PHASE_FINISHED)
 			_clear_attack_runtime_state_after_animation(finished_attack_profile)
 			_clear_attack_lockout_after_animation(finished_attack_profile)
+			if _try_consume_buffered_firearm_reload():
+				return
 		else:
 			_set_attack_active(false)
 			_change_player_state(PSM.IDLE)
@@ -545,6 +594,8 @@ func _on_animation_player_finished(animation_name: StringName) -> void:
 			_set_current_attack_phase(PCC.PHASE_FINISHED)
 			_clear_attack_runtime_state_after_animation(finished_attack_profile)
 			_clear_attack_lockout_after_animation(finished_attack_profile)
+			if _try_consume_buffered_firearm_reload():
+				return
 		else:
 			_set_attack_active(false)
 			_change_player_state(PSM.IDLE)
@@ -645,6 +696,185 @@ func _is_firearm_hold_session_active() -> bool:
 
 func _get_firearm_hold_session_direction(fallback_direction := current_direction) -> String:
 	return _firearm_controller.get_hold_session_direction(fallback_direction)
+
+
+func _try_start_firearm_reload(direction_name := current_direction, manual_reload := false, resume_hold_repeat := false) -> bool:
+	if manual_reload:
+		if not _firearm_controller.can_manual_reload(equipped_weapon):
+			return false
+	elif not _firearm_controller.should_auto_reload(equipped_weapon):
+		return false
+
+	if resume_hold_repeat:
+		if not _firearm_reload_resume_hold_repeat:
+			_capture_firearm_reload_resume_context(direction_name)
+	else:
+		_clear_firearm_reload_resume_context()
+	_end_firearm_hold_session()
+	_clear_attack_runtime_state()
+	_combat_controller.clear_primary_attack_hold_state()
+	_sync_primary_attack_input_debug_fields()
+	attack_lockout_remaining = 0.0
+	current_direction = direction_name if direction_name != "" else current_direction
+	var reload_animation := _animation_name("reload", current_direction)
+	var reload_duration := _firearm_reload_animation_duration(reload_animation)
+	if not _firearm_controller.start_reload(equipped_weapon, current_direction, reload_duration):
+		return false
+	_change_player_state(PSM.RELOAD)
+	_play_body_animation_for_reload(current_direction)
+	_play_reload_visual(reload_animation)
+	if reload_duration <= 0.0:
+		_complete_firearm_reload()
+	return true
+
+
+func _buffer_firearm_reload(direction_name := current_direction, allow_pending := false) -> void:
+	if not allow_pending and not _firearm_controller.can_manual_reload(equipped_weapon):
+		return
+	_firearm_reload_buffered = true
+	if _should_restore_hold_repeat_after_reload():
+		_capture_firearm_reload_resume_context(direction_name)
+	else:
+		_firearm_reload_resume_hold_repeat = false
+		_firearm_reload_resume_weapon = null
+	_firearm_reload_resume_direction = direction_name if direction_name != "" else current_direction
+	_end_firearm_hold_session()
+	_combat_controller.clear_primary_attack_hold_state()
+	_sync_primary_attack_input_debug_fields()
+
+
+func _try_consume_buffered_firearm_reload() -> bool:
+	if not _firearm_reload_buffered:
+		return false
+	_firearm_reload_buffered = false
+	var reload_direction := _firearm_reload_resume_direction if _firearm_reload_resume_direction != "" else current_direction
+	var should_resume := _firearm_reload_resume_hold_repeat
+	if not _try_start_firearm_reload(reload_direction, true, should_resume):
+		_clear_firearm_reload_resume_context()
+		return false
+	return true
+
+
+func _capture_firearm_reload_resume_context(direction_name := current_direction) -> void:
+	_firearm_reload_resume_hold_repeat = _should_restore_hold_repeat_after_reload()
+	_firearm_reload_resume_direction = direction_name if direction_name != "" else current_direction
+	_firearm_reload_resume_weapon = equipped_weapon
+
+
+func _clear_firearm_reload_resume_context() -> void:
+	_firearm_reload_buffered = false
+	_firearm_reload_resume_hold_repeat = false
+	_firearm_reload_resume_direction = ""
+	_firearm_reload_resume_weapon = null
+
+
+func _should_restore_hold_repeat_after_reload() -> bool:
+	var attack_profile := _get_attack_profile("attack_first")
+	if not _should_use_firearm_hold_session(attack_profile):
+		return false
+	return _is_firearm_hold_session_active() or _combat_controller.primary_attack_repeat_ready or _combat_controller.primary_attack_repeat_active or _is_key_currently_pressed(primary_attack_key)
+
+
+func _update_firearm_reload(delta: float) -> bool:
+	if not _is_firearm_reloading():
+		return false
+	_apply_firearm_reload_movement()
+	if _firearm_controller.update_reload(delta, equipped_weapon):
+		_complete_firearm_reload()
+	return true
+
+
+func _complete_firearm_reload() -> void:
+	_firearm_controller.finish_reload(equipped_weapon)
+	if _should_resume_firearm_hold_repeat_after_reload():
+		var resume_direction := _firearm_reload_resume_direction if _firearm_reload_resume_direction != "" else current_direction
+		_clear_firearm_reload_resume_context()
+		_begin_firearm_hold_session(resume_direction)
+		_combat_controller.primary_attack_hold_time = _get_hold_to_repeat_delay(_get_attack_profile("attack_first"))
+		_combat_controller.set_primary_attack_repeat_ready(true)
+		_combat_controller.set_primary_attack_repeat_active(true)
+		_sync_primary_attack_input_debug_fields()
+		attack("attack_first", resume_direction, ATTACK_INTERVAL_REPEAT)
+		return
+	_clear_firearm_reload_resume_context()
+	_return_to_locomotion_state()
+
+
+func _should_resume_firearm_hold_repeat_after_reload() -> bool:
+	if not _firearm_reload_resume_hold_repeat:
+		return false
+	if equipped_weapon == null or equipped_weapon != _firearm_reload_resume_weapon:
+		return false
+	if health <= 0 or stun_time_remaining > 0.0:
+		return false
+	if not _is_key_currently_pressed(primary_attack_key):
+		return false
+	if not _firearm_controller.can_fire(equipped_weapon):
+		return false
+	return _should_use_firearm_hold_session(_get_attack_profile("attack_first"))
+
+
+func _cancel_firearm_reload() -> void:
+	_clear_firearm_reload_resume_context()
+	if _is_firearm_reloading():
+		_firearm_controller.cancel_reload()
+
+
+func _is_firearm_reloading() -> bool:
+	return _firearm_controller.is_reloading()
+
+
+func _apply_firearm_reload_movement() -> void:
+	var reload_direction := _firearm_controller.get_reload_direction(current_direction)
+	current_direction = reload_direction
+	var movement := _get_keyboard_movement()
+	if movement == Vector2.ZERO or not _firearm_controller.can_move_while_reloading(equipped_weapon):
+		velocity = Vector2.ZERO
+		_play_body_animation_for_reload(reload_direction)
+		return
+	velocity = movement.normalized() * get_move_speed() * _firearm_controller.get_reload_move_speed_multiplier(equipped_weapon, attacking_move_speed_multiplier)
+	_play_body_animation_for_reload(reload_direction, true)
+
+
+func _play_body_animation_for_reload(direction_name: String, moving := false) -> void:
+	var body_animation := "walk_%s" % direction_name if moving else "idle_%s" % direction_name
+	if sprite.animation == StringName(body_animation) and sprite.is_playing():
+		return
+	if sprite.sprite_frames != null and sprite.sprite_frames.has_animation(body_animation):
+		sprite.play(body_animation)
+
+
+func _play_reload_visual(reload_animation: String) -> void:
+	if hands_sprite == null or hands_sprite.sprite_frames == null or not _equipment_visual_enabled:
+		return
+	if not hands_sprite.sprite_frames.has_animation(reload_animation):
+		hands_sprite.hide()
+		return
+	hands_sprite.show()
+	_apply_equipment_visual_offset(reload_animation)
+	_apply_equipment_visual_layer(reload_animation)
+	hands_sprite.animation = StringName(reload_animation)
+	hands_sprite.frame = 0
+	hands_sprite.speed_scale = 1.0
+	hands_sprite.play()
+
+
+func _sync_reload_visual() -> void:
+	var reload_animation := _animation_name("reload", _firearm_controller.get_reload_direction(current_direction))
+	if hands_sprite == null or hands_sprite.sprite_frames == null or not hands_sprite.sprite_frames.has_animation(reload_animation):
+		return
+	_apply_equipment_visual_offset(reload_animation)
+	_apply_equipment_visual_layer(reload_animation)
+
+
+func _firearm_reload_animation_duration(reload_animation: String) -> float:
+	if hands_sprite == null or hands_sprite.sprite_frames == null or not hands_sprite.sprite_frames.has_animation(reload_animation):
+		return 0.0
+	var frame_count := hands_sprite.sprite_frames.get_frame_count(reload_animation)
+	var animation_speed := hands_sprite.sprite_frames.get_animation_speed(reload_animation)
+	if animation_speed <= 0.0:
+		return 0.0
+	return float(frame_count) / float(animation_speed)
 
 
 func _should_preserve_hold_repeat_input(attack_profile: Resource) -> bool:
@@ -807,6 +1037,7 @@ func _execute_projectile_attack(attack_profile: Resource, animation_name: String
 		_projectile_spawn_position(),
 		_equipment_visual_offset_for_animation(animation_name)
 	)
+	_firearm_controller.consume_shot(equipped_weapon)
 
 
 func _projectile_spawn_position() -> Vector2:
@@ -816,11 +1047,16 @@ func _projectile_spawn_position() -> Vector2:
 
 func _try_repeat_held_attack() -> bool:
 	_sync_primary_attack_input_controller_from_debug_fields()
-	if not keyboard_control_enabled or is_stunned() or attack_lockout_remaining > 0.0:
+	if not keyboard_control_enabled or is_stunned() or _is_firearm_reloading() or attack_lockout_remaining > 0.0:
 		return false
 	if _is_locked_animation() and not _can_repeat_during_locked_attack():
 		return false
 	if _combat_controller.is_primary_attack_repeat_ready() and _should_repeat_attack("attack_first"):
+		if _firearm_reload_buffered and _firearm_controller.can_manual_reload(equipped_weapon):
+			return _try_consume_buffered_firearm_reload()
+		var attack_profile := _get_attack_profile("attack_first")
+		if _should_use_firearm_hold_session(attack_profile) and not _is_firearm_hold_session_active():
+			_begin_firearm_hold_session(current_direction)
 		_combat_controller.set_primary_attack_repeat_active(true)
 		_sync_primary_attack_input_debug_fields()
 		attack("attack_first", _get_firearm_hold_session_direction(current_direction), ATTACK_INTERVAL_REPEAT)
@@ -855,6 +1091,10 @@ func _is_holding_repeat_attack() -> bool:
 
 func _update_primary_attack_hold_state(delta: float) -> void:
 	_sync_primary_attack_input_controller_from_debug_fields()
+	if _is_firearm_reloading():
+		_combat_controller.clear_primary_attack_hold_state()
+		_sync_primary_attack_input_debug_fields()
+		return
 	if not _is_key_currently_pressed(primary_attack_key):
 		_end_firearm_hold_session()
 		if _combat_controller.primary_attack_repeat_active:
@@ -1050,6 +1290,7 @@ func drop_current_weapon() -> bool:
 	pickup.global_position = global_position + _direction_vector_from_name(current_direction) * 18.0
 	pickup.set("item_data", equipped_weapon)
 
+	_cancel_firearm_reload()
 	equipped_weapon = null
 	_end_firearm_hold_session()
 	_clear_attack_runtime_state()
@@ -1131,6 +1372,7 @@ func die() -> void:
 
 	velocity = Vector2.ZERO
 	_change_player_state(PSM.DEAD)
+	_cancel_firearm_reload()
 	_end_firearm_hold_session()
 	_clear_attack_runtime_state()
 	var death_animation := _animation_name("death_first", current_direction)
@@ -1149,6 +1391,18 @@ func get_max_health() -> int:
 
 func get_current_health() -> int:
 	return health
+
+
+func get_current_weapon_ammo() -> int:
+	return _firearm_controller.get_current_ammo(equipped_weapon)
+
+
+func get_current_weapon_magazine_size() -> int:
+	return _firearm_controller.get_magazine_size(equipped_weapon)
+
+
+func is_reloading_weapon() -> bool:
+	return _is_firearm_reloading()
 
 
 func get_player_state() -> String:
@@ -1199,6 +1453,7 @@ func apply_status_effect(effect_name: String, duration: float, _source: Node = n
 		stun_time_remaining = maxf(stun_time_remaining, duration)
 		velocity = Vector2.ZERO
 		_change_player_state(PSM.STUNNED)
+		_cancel_firearm_reload()
 		_end_firearm_hold_session()
 		_clear_attack_runtime_state()
 		attack_lockout_remaining = 0.0

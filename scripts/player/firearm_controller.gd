@@ -5,6 +5,11 @@ const PCC = preload("res://scripts/player/player_combat_controller.gd")
 
 var hold_session_active := false
 var hold_session_direction := "side"
+var reload_active := false
+var reload_direction := "side"
+var reload_time_remaining := 0.0
+var reload_weapon_key := ""
+var current_magazine_by_weapon := {}
 
 
 func is_firearm_profile(attack_profile: Resource, equipped_weapon: Resource) -> bool:
@@ -73,6 +78,111 @@ func get_hold_session_direction(fallback_direction := "side") -> String:
 	return hold_session_direction if hold_session_active else fallback_direction
 
 
+func is_magazine_enabled(equipped_weapon: Resource) -> bool:
+	return equipped_weapon != null and String(equipped_weapon.get("weapon_type")) == "firearm" and get_magazine_size(equipped_weapon) > 0
+
+
+func get_magazine_size(equipped_weapon: Resource) -> int:
+	if equipped_weapon == null:
+		return 0
+	return maxi(int(equipped_weapon.get("magazine_size")), 0)
+
+
+func get_current_ammo(equipped_weapon: Resource) -> int:
+	if not is_magazine_enabled(equipped_weapon):
+		return 0
+	var weapon_key := _weapon_key(equipped_weapon)
+	if not current_magazine_by_weapon.has(weapon_key):
+		current_magazine_by_weapon[weapon_key] = get_magazine_size(equipped_weapon)
+	return int(current_magazine_by_weapon[weapon_key])
+
+
+func can_fire(equipped_weapon: Resource) -> bool:
+	if reload_active:
+		return false
+	if not is_magazine_enabled(equipped_weapon):
+		return true
+	return get_current_ammo(equipped_weapon) > 0
+
+
+func should_auto_reload(equipped_weapon: Resource) -> bool:
+	return is_magazine_enabled(equipped_weapon) and bool(equipped_weapon.get("auto_reload_when_empty")) and get_current_ammo(equipped_weapon) <= 0
+
+
+func can_manual_reload(equipped_weapon: Resource) -> bool:
+	if reload_active or not is_magazine_enabled(equipped_weapon):
+		return false
+	return get_current_ammo(equipped_weapon) < get_magazine_size(equipped_weapon)
+
+
+func is_magazine_full(equipped_weapon: Resource) -> bool:
+	if not is_magazine_enabled(equipped_weapon):
+		return false
+	return get_current_ammo(equipped_weapon) >= get_magazine_size(equipped_weapon)
+
+
+func consume_shot(equipped_weapon: Resource) -> void:
+	if not is_magazine_enabled(equipped_weapon):
+		return
+	var weapon_key := _weapon_key(equipped_weapon)
+	current_magazine_by_weapon[weapon_key] = maxi(get_current_ammo(equipped_weapon) - 1, 0)
+
+
+func start_reload(equipped_weapon: Resource, direction_name: String, reload_duration: float) -> bool:
+	if not is_magazine_enabled(equipped_weapon):
+		return false
+	reload_active = true
+	reload_direction = direction_name if direction_name != "" else "side"
+	reload_time_remaining = maxf(reload_duration, 0.0)
+	reload_weapon_key = _weapon_key(equipped_weapon)
+	end_hold_session()
+	return true
+
+
+func update_reload(delta: float, equipped_weapon: Resource) -> bool:
+	if not reload_active:
+		return false
+	if reload_weapon_key != _weapon_key(equipped_weapon):
+		cancel_reload()
+		return false
+	reload_time_remaining = maxf(reload_time_remaining - delta, 0.0)
+	if reload_time_remaining > 0.0:
+		return false
+	return true
+
+
+func finish_reload(equipped_weapon: Resource) -> void:
+	if is_magazine_enabled(equipped_weapon):
+		current_magazine_by_weapon[_weapon_key(equipped_weapon)] = get_magazine_size(equipped_weapon)
+	reload_active = false
+	reload_time_remaining = 0.0
+	reload_weapon_key = ""
+
+
+func cancel_reload() -> void:
+	reload_active = false
+	reload_time_remaining = 0.0
+	reload_weapon_key = ""
+
+
+func is_reloading() -> bool:
+	return reload_active
+
+
+func get_reload_direction(fallback_direction := "side") -> String:
+	return reload_direction if reload_active else fallback_direction
+
+
+func can_move_while_reloading(equipped_weapon: Resource) -> bool:
+	return equipped_weapon != null and bool(equipped_weapon.get("can_move_while_reloading"))
+
+
+func get_reload_move_speed_multiplier(equipped_weapon: Resource, fallback_multiplier: float) -> float:
+	if equipped_weapon == null:
+		return fallback_multiplier
+	return clampf(float(equipped_weapon.get("reload_move_speed_multiplier")), 0.0, 1.0)
+
+
 func execute_projectile_attack(
 	source: Node2D,
 	parent: Node,
@@ -107,6 +217,14 @@ func execute_projectile_attack(
 
 	_spawn_muzzle_flash(effect_manager, parent, source.global_position, attack_profile, direction_name, equipment_visual_offset)
 	_spawn_bullet_casing(effect_manager, parent, source.global_position, attack_profile, direction_name, equipment_visual_offset)
+
+
+func _weapon_key(equipped_weapon: Resource) -> String:
+	if equipped_weapon == null:
+		return ""
+	if equipped_weapon.resource_path != "":
+		return equipped_weapon.resource_path
+	return str(equipped_weapon.get_instance_id())
 
 
 func _spread_projectile_direction(base_direction: Vector2, projectile_index: int, projectile_count: int, spread_degrees: float) -> Vector2:

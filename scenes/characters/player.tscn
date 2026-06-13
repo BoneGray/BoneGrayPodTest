@@ -1,11 +1,11 @@
 [gd_scene format=3 uid="uid://cid64ugn1d0ua"]
 
 [ext_resource type="Script" uid="uid://dmbarady6skoe" path="res://scripts/player/player.gd" id="1_atpat"]
-[ext_resource type="Resource" path="res://resources/characters/player/player_stats.tres" id="2_kqtwu"]
+[ext_resource type="Resource" uid="uid://bam0vko154jq6" path="res://resources/characters/player/player_stats.tres" id="2_kqtwu"]
 [ext_resource type="SpriteFrames" uid="uid://bmjn301svtkye" path="res://resources/characters/player/player_no_hands_sprite_frames.tres" id="3_6eyoc"]
 [ext_resource type="SpriteFrames" uid="uid://dur3nrj50g5vl" path="res://resources/characters/player/player_hands_sprite_frames.tres" id="4_eojnx"]
 [ext_resource type="Script" uid="uid://bu867rg6booq6" path="res://scripts/combat/hurt_flash_feedback.gd" id="5_qgnko"]
-[ext_resource type="Resource" path="res://resources/equipment/weapons/unarmed/unarmed_primary_attack.tres" id="6_unarmed_primary"]
+[ext_resource type="Resource" uid="uid://dsbs0op3730e6" path="res://resources/equipment/weapons/unarmed/unarmed_primary_attack.tres" id="6_unarmed_primary"]
 [ext_resource type="Resource" path="res://resources/equipment/weapons/unarmed/unarmed_secondary_attack.tres" id="7_unarmed_secondary"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_7vyk4"]
@@ -2758,7 +2758,6 @@ _data = {
 }
 
 [node name="Player" type="CharacterBody2D" unique_id=1160340334 groups=["player"]]
-z_index = 0
 collision_layer = 2
 script = ExtResource("1_atpat")
 stats = ExtResource("2_kqtwu")
@@ -2769,11 +2768,13 @@ camera_follow_enabled = false
 
 [node name="Sprite" type="AnimatedSprite2D" parent="." unique_id=2078166478]
 sprite_frames = ExtResource("3_6eyoc")
-animation = &"idle_down"
+animation = &"attack_down_first"
+frame = 3
 
 [node name="HandsSprite" type="AnimatedSprite2D" parent="." unique_id=874019963]
 sprite_frames = ExtResource("4_eojnx")
-animation = &"idle_down"
+animation = &"attack_down_first"
+frame = 3
 
 [node name="BodyCollisionShape2D" type="CollisionShape2D" parent="." unique_id=1817283936]
 position = Vector2(0, 3)
@@ -2790,7 +2791,7 @@ shape = SubResource("RectangleShape2D_2l4js")
 metadata/_edit_lock_ = true
 
 [node name="AttackArea2D" type="Area2D" parent="." unique_id=134106102]
-position = Vector2(10, 1)
+position = Vector2(0, 8)
 collision_layer = 0
 collision_mask = 48
 monitoring = false
