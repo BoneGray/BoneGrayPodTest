@@ -117,3 +117,16 @@ SceneRoot
 - `WorldActors` 中需要和角色互相遮挡的部分必须作为直接子节点参与 YSort。
 - 不再允许复合物体通过自身脚本在编辑器或运行时偷偷移动子节点来修层级。
 - 地图编辑时移动 `CompoundPropMarkers` 下的 marker；运行 `tools/build_compound_prop_layers.gd` 后生成或刷新正式层级节点。
+## 遮挡透明迁移补充
+
+当树冠、屋顶、天花板、前景墙体、高草等高层遮挡物影响玩家可读性时，优先使用通用 `OcclusionFadeArea`，不要为单个场景或单棵树写临时透明逻辑。
+
+迁移流程：
+- 先确认对象属于 `HighOverlay` 的前景遮挡部分。
+- 在完整源资源中把 `OcclusionFadeArea` 作为复合物体的功能节点放在根节点下，和 `Shadow`、`Trunk`、`Canopy` 平级。
+- 透明目标默认指向父节点；如果一个区域要同时淡化多个节点，先讨论是否需要扩展为多目标配置。
+- 对树这类跨层复合物体，树冠使用较低透明度，树干 Sprite 可通过 `CompoundPropDefinition.fade_sort_actor_sprite_with_overlay` 轻微淡化。
+- 复合物体的常用淡化数值放在 `CompoundPropDefinition` 上调节：`overlay_faded_alpha` 和 `sort_actor_sprite_faded_alpha`。
+- 只淡化视觉节点，不淡化碰撞节点、YSort 主体节点或角色节点。
+- 触发组默认只使用 `player`。
+- 验证时检查玩家进入遮挡区域会淡化前景，离开后恢复；同时确认 YSort、碰撞和树干遮挡关系没有变化。

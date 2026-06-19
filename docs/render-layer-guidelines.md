@@ -320,3 +320,97 @@ tools/build_compound_prop_layers.gd
 - 日常调整先改完整源资源。
 - marker 运行时优先从完整源资源生成正式三层。
 - 不再维护 `tree_yellow_shadow_part.tscn`、`tree_yellow_trunk_actor.tscn`、`tree_yellow_canopy_part.tscn` 这类静态 part，避免源资源和运行资源漂移。
+## 高层遮挡透明规则
+
+树冠、屋顶、天花板、前景墙体、高草这类处在 `HighOverlay` 的视觉遮挡物，可以在玩家进入遮挡区域时临时降低透明度，帮助玩家辨认自己和交互对象的位置。
+
+规则：
+- 透明变化属于“前景遮挡物”的能力，不属于 Player、Enemy 或世界 YSort 的能力。
+- 不通过修改 Player、Enemy、Pickup 的透明度来解决遮挡可读性问题。
+- 不改变 `WorldActors` 的 YSort，也不改变树干、墙体、家具主体的碰撞逻辑。
+- 可复用资源应在完整源资源里配置遮挡区域，例如根节点下的 `OcclusionFadeArea`。
+- marker 从完整源资源生成 `HighOverlay` 节点时，遮挡区域随对应高层视觉节点一起复制。
+- 一个 `OcclusionFadeArea` 可以用多个 `CollisionShape2D` 拼出复杂遮挡轮廓，也可以同时淡化多个视觉目标。
+- 树冠、屋顶这类前景部分可以淡得更明显；树干、墙体上半部这类实体主体只应轻微淡化，并且只淡化视觉 Sprite，不淡化碰撞体或排序主体。
+- 复合物体跨层生成后，如果 `HighOverlay` 的遮挡区域需要连带淡化 `WorldActors` 里的主体 Sprite，应通过 `CompoundPropDefinition` 显式配置，不要写场景特例。
+- 对复合物体，常用透明度应优先在 `CompoundPropDefinition` 中调整：`overlay_faded_alpha` 控制高层视觉，`sort_actor_sprite_faded_alpha` 控制 YSort 主体 Sprite。
+- 默认只允许 `player` 组触发透明变化；敌人是否触发应按具体玩法另行讨论。
+- `fade_target_path`、`trigger_group`、`faded_alpha`、`fade_in_time`、`fade_out_time` 必须作为可调属性暴露，并写明属性描述。
+
+推荐默认值：
+```text
+trigger_group = "player"
+faded_alpha = 0.45
+overlay_faded_alpha = 0.45
+fade_in_time = 0.12
+fade_out_time = 0.18
+sort_actor_sprite_faded_alpha = 0.72
+```
+
+标准结构：
+```text
+TreeXxx.tscn
++-- Shadow
++-- Trunk
+|   +-- Sprite
+|   +-- CollisionShape2D
++-- Canopy
++-- OcclusionFadeArea
+    +-- CollisionShape2D
+    +-- CollisionShape2D2
+```
+## 环境摆动动画规则
+
+树木、草丛、藤蔓、旗帜、门帘、布条等环境氛围动画，应优先使用通用 `AmbientSway2D`，不要为单个资源写一次性动画脚本。
+
+规则：
+- 摆动只作用在视觉节点上，例如 `Trunk/Sprite`、`Canopy`、草叶 Sprite、布条 Sprite。
+- 不要摆动 `StaticBody2D`、`CollisionShape2D`、`Area2D`、`OcclusionFadeArea` 或参与 YSort 的主体根节点。
+- 树干、墙体主体这类实体视觉只能轻微摆动；树冠、草叶、藤蔓这类柔性视觉可以更明显。
+- 同类物体应使用 `randomize_phase` 或 `phase_offset` 错开摆动，避免整片场景同步摇动。
+- 摆动参数必须作为 Inspector 可调属性暴露，并使用中文 `##` 注释说明用途。
+
+推荐树木参数：
+```text
+Trunk/Sprite:
+duration = 3.2
+position_amplitude = Vector2(0.25, 0)
+rotation_degrees_amplitude = 0.45
+
+Canopy:
+duration = 2.6
+position_amplitude = Vector2(1.1, 0.25)
+rotation_degrees_amplitude = 1.0
+scale_amplitude = Vector2(0.006, 0.006)
+```
+
+## 树木与复合环境物体模板
+
+`tree_yellow_split.tscn` 是当前树木模板。后续新增树木、可遮挡建筑、带屋顶家具、藤蔓、门帘等复合环境物体时，应优先沿用这套结构，再按资源差异调整部件名称和参数。
+
+标准树木源资源结构：
+```text
+TreeXxxSplit
++-- Shadow
++-- Trunk
+|   +-- Sprite              # 可挂 AmbientSway2D，只做轻微视觉摆动
+|   +-- CollisionShape2D    # 不摆动，负责实体碰撞
++-- Canopy                  # 可挂 AmbientSway2D，负责高层覆盖视觉
++-- OcclusionFadeArea       # 不摆动，负责玩家进入遮挡区检测
+    +-- CollisionShape2D    # 可以多个 shape 拼复杂轮廓
+```
+
+配套资源：
+```text
+resources/world/props/trees/tree_xxx_compound_prop.tres
+scenes/world/props/trees/tree_xxx_placement_marker.tscn
+scenes/world/props/trees/tree_xxx_split.tscn
+```
+
+模板规则：
+- `Split` 场景是唯一需要维护的完整源资源，打开 `.tscn` 时必须能看到完整结构。
+- 地图里拖放 `PlacementMarker`，不要直接把 `Split` 场景当正式物体放进 `WorldActors`。
+- `CompoundPropDefinition` 负责配置生成路径、透明度和跨层淡化规则。
+- `AmbientSway2D` 只能挂视觉节点，不能挂碰撞节点、遮挡检测区域或参与 YSort 的主体根节点。
+- `OcclusionFadeArea` 和视觉节点平级，表达“整个复合物体的遮挡检测”，不要藏在 `Canopy` 里。
+- 同类资源新增前，先复制模板并改资源引用、碰撞范围、遮挡范围和摆动参数；不要复制运行时生成节点作为源资源。

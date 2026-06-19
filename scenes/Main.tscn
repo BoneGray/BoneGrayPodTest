@@ -29,8 +29,20 @@ tile_set = ExtResource("1_elqb8")
 
 [node name="CompoundPropMarkers" type="Node2D" parent="." unique_id=296595694]
 
+[node name="TreeYellow2" parent="CompoundPropMarkers" unique_id=232175113 instance=ExtResource("9_tree_marker")]
+position = Vector2(145, 15)
+
 [node name="TreeYellow" parent="CompoundPropMarkers" unique_id=124027651 instance=ExtResource("9_tree_marker")]
-position = Vector2(181, 175)
+position = Vector2(192, 15)
+
+[node name="TreeYellow3" parent="CompoundPropMarkers" unique_id=1865370487 instance=ExtResource("9_tree_marker")]
+position = Vector2(238, 14)
+
+[node name="TreeYellow4" parent="CompoundPropMarkers" unique_id=110777276 instance=ExtResource("9_tree_marker")]
+position = Vector2(337, 15)
+
+[node name="TreeYellow5" parent="CompoundPropMarkers" unique_id=631634867 instance=ExtResource("9_tree_marker")]
+position = Vector2(289, 15)
 
 [node name="ShadowLayer" type="Node2D" parent="." unique_id=310260513]
 z_index = -50

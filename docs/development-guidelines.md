@@ -264,3 +264,10 @@ resources/equipment/pickups/item_name_world_texture.tres
 -> 新增 food_world_texture.tres
 -> ItemData.world_texture 引用 food_world_texture.tres
 ```
+## Godot Inspector 属性说明补充
+
+- `@export` 属性上方的 `##` 文档注释会显示在 Godot Inspector 中，应视为用户可见文本。
+- 代码标识符、文件名、节点名保持英文；Inspector 属性说明、调参说明、设计说明默认使用中文。
+- 除非是第三方原文、引擎固定术语或不可翻译的 API 名称，否则不要把 Inspector 属性说明写成英文。
+- 每次新增或修改 `@export` 属性后，必须自查同一文件内新增的 `##` 说明是否为中文，并确认说明与当前属性职责一致。
+- 如果属性属于通用组件或会被后续项目复用，中文说明要写清楚它面向的调参场景，避免只描述当前单个资源。

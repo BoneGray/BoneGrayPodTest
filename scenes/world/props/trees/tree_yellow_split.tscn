@@ -1,6 +1,8 @@
 [gd_scene format=3 uid="uid://dqjs5kilqs6jq"]
 
 [ext_resource type="Texture2D" uid="uid://d0jfiun20ld63" path="res://assets/world/props/forgotten_memories/trees/trees_separated.png" id="1_trees"]
+[ext_resource type="Script" uid="uid://cltxu1ndnv2v4" path="res://scripts/world/props/occlusion_fade_area.gd" id="2_fade_area"]
+[ext_resource type="Script" path="res://scripts/world/props/ambient_sway_2d.gd" id="3_sway"]
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_shadow"]
 atlas = ExtResource("1_trees")
@@ -17,6 +19,13 @@ size = Vector2(18, 5.5)
 atlas = ExtResource("1_trees")
 region = Rect2(196, 48, 56, 84)
 
+[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_dugh5"]
+radius = 21.0
+height = 68.0
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_dugh5"]
+size = Vector2(9, 26)
+
 [node name="TreeYellowSplit" type="Node2D" unique_id=1373043663]
 y_sort_enabled = true
 
@@ -31,6 +40,12 @@ texture = SubResource("AtlasTexture_shadow")
 [node name="Sprite" type="Sprite2D" parent="Trunk" unique_id=947960876]
 position = Vector2(0, -19)
 texture = SubResource("AtlasTexture_trunk")
+script = ExtResource("3_sway")
+duration = 3.2
+position_amplitude = Vector2(0.25, 0)
+rotation_degrees_amplitude = 0.45
+phase_offset = 0.12
+random_phase_range = 0.45
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Trunk" unique_id=810086294]
 position = Vector2(1, -4)
@@ -40,3 +55,25 @@ shape = SubResource("RectangleShape2D_trunk")
 z_index = 100
 position = Vector2(2, -71)
 texture = SubResource("AtlasTexture_canopy")
+script = ExtResource("3_sway")
+duration = 2.6
+position_amplitude = Vector2(1.1, 0.25)
+rotation_degrees_amplitude = 1.0
+scale_amplitude = Vector2(0.006, 0.006)
+phase_offset = 0.32
+
+[node name="OcclusionFadeArea" type="Area2D" parent="." unique_id=726435223]
+position = Vector2(2, -27)
+collision_layer = 0
+collision_mask = 2
+monitorable = false
+script = ExtResource("2_fade_area")
+fade_target_path = NodePath("")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="OcclusionFadeArea" unique_id=1551467194]
+position = Vector2(-2, -39)
+shape = SubResource("CapsuleShape2D_dugh5")
+
+[node name="CollisionShape2D2" type="CollisionShape2D" parent="OcclusionFadeArea" unique_id=412970473]
+position = Vector2(-2.5, 10)
+shape = SubResource("RectangleShape2D_dugh5")
