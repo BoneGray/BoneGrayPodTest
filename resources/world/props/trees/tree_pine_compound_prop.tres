@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="CompoundPropDefinition" format=3]
+
+[ext_resource type="Script" uid="uid://bmfvpdhgd5hv6" path="res://scripts/world/props/compound_prop_definition.gd" id="1_definition"]
+[ext_resource type="PackedScene" path="res://scenes/world/props/trees/tree_pine_split.tscn" id="2_source"]
+
+[resource]
+script = ExtResource("1_definition")
+prop_id = "tree_pine"
+source_scene = ExtResource("2_source")
+shadow_parent_path = NodePath("ShadowLayer/TreeShadowLayer")
+overlay_parent_path = NodePath("HighOverlay/TreeCanopyLayer")
+overlay_faded_alpha = 0.5
+fade_sort_actor_sprite_with_overlay = true
+sort_actor_sprite_faded_alpha = 0.78

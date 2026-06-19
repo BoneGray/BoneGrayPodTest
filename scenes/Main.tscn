@@ -1,6 +1,7 @@
 [gd_scene format=4 uid="uid://cuebi6odp60qg"]
 
 [ext_resource type="TileSet" uid="uid://jtofupj1n278" path="res://resources/tiles/forgotten_memories_water_tileset.tres" id="1_elqb8"]
+[ext_resource type="PackedScene" path="res://scenes/world/props/trees/tree_pine_placement_marker.tscn" id="2_c01mt"]
 [ext_resource type="PackedScene" uid="uid://cid64ugn1d0ua" path="res://scenes/characters/player.tscn" id="2_rvslj"]
 [ext_resource type="Script" uid="uid://dxhg5ioo3crwh" path="res://scripts/camera_follow_target.gd" id="3_5gc6h"]
 [ext_resource type="Script" uid="uid://r3enqxmtn0cn" path="res://scripts/world/tilemap_navigation_region_builder.gd" id="5_0xw7e"]
@@ -28,6 +29,9 @@ tile_map_data = PackedByteArray("AAAAAAAABQAAAAAAAAAAAAEABQAOAAsAAAAAAAIABQAAAAE
 tile_set = ExtResource("1_elqb8")
 
 [node name="CompoundPropMarkers" type="Node2D" parent="." unique_id=296595694]
+
+[node name="TreePine" parent="CompoundPropMarkers" unique_id=1478246984 instance=ExtResource("2_c01mt")]
+position = Vector2(203, 129)
 
 [node name="TreeYellow2" parent="CompoundPropMarkers" unique_id=232175113 instance=ExtResource("9_tree_marker")]
 position = Vector2(145, 15)

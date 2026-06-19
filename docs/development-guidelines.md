@@ -221,6 +221,7 @@ CharacterBody2D
 ## 渲染层级补充入口
 
 - 涉及地形、建筑、树木、拾取物、飞行物、角色装备、手部动画、YSort 或 `z_index` 的需求，先看 `docs/render-layer-guidelines.md`。
+- 新增场景图片资源时，先按 `docs/render-layer-guidelines.md` 的“场景物体复杂度分级”判断它是完整交互物体、普通实体物体、纯视觉装饰，还是批量背景/地形装饰，再决定是否使用复合物体模板、普通 Sprite、TileMap、atlas 或大图。
 - 地板、草地、马路、河流等地形底板属于 `TerrainLayer`，不参与 YSort。
 - 玩家、敌人、地上可拾取物、掉落武器、树干、墙体主体、车辆、石块、草丛属于 `WorldActors`，由 YSort 按地面原点决定前后遮挡。
 - 树冠、屋顶、天花板和天空遮挡属于 `HighOverlay`，固定覆盖在角色、装备、拾取物和飞行物之上。
