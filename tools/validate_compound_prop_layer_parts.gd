@@ -2,8 +2,28 @@
 extends SceneTree
 
 const MAIN_SCENE_PATH := "res://scenes/Main.tscn"
-const TREE_SOURCE_PATH := "res://scenes/world/props/trees/tree_yellow_split.tscn"
-const TREE_MARKER_PATH := "res://scenes/world/props/trees/tree_yellow_placement_marker.tscn"
+const TREE_PREFABS := [
+	{
+		"source": "res://scenes/world/props/trees/tree_yellow_split.tscn",
+		"marker": "res://scenes/world/props/trees/tree_yellow_placement_marker.tscn",
+	},
+	{
+		"source": "res://scenes/world/props/trees/tree_pine_split.tscn",
+		"marker": "res://scenes/world/props/trees/tree_pine_placement_marker.tscn",
+	},
+	{
+		"source": "res://scenes/world/props/trees/tree_orange_split.tscn",
+		"marker": "res://scenes/world/props/trees/tree_orange_placement_marker.tscn",
+	},
+	{
+		"source": "res://scenes/world/props/trees/tree_blue_split.tscn",
+		"marker": "res://scenes/world/props/trees/tree_blue_placement_marker.tscn",
+	},
+	{
+		"source": "res://scenes/world/props/trees/tree_willow_split.tscn",
+		"marker": "res://scenes/world/props/trees/tree_willow_placement_marker.tscn",
+	},
+]
 
 
 func _initialize() -> void:
@@ -11,10 +31,11 @@ func _initialize() -> void:
 
 
 func _run() -> void:
-	if not _validate_tree_source_prefab():
-		return
-	if not _validate_tree_marker():
-		return
+	for tree_prefab in TREE_PREFABS:
+		if not _validate_tree_source_prefab(tree_prefab["source"]):
+			return
+		if not _validate_tree_marker(tree_prefab["marker"]):
+			return
 	if not _validate_main_tree_marker_layer():
 		return
 
@@ -22,10 +43,10 @@ func _run() -> void:
 	quit()
 
 
-func _validate_tree_source_prefab() -> bool:
-	var scene := load(TREE_SOURCE_PATH) as PackedScene
+func _validate_tree_source_prefab(scene_path: String) -> bool:
+	var scene := load(scene_path) as PackedScene
 	if scene == null:
-		return _fail("Could not load tree source prefab.")
+		return _fail("Could not load tree source prefab: %s." % scene_path)
 
 	var tree := scene.instantiate() as Node2D
 	if tree == null:
@@ -37,23 +58,27 @@ func _validate_tree_source_prefab() -> bool:
 	for node_path in ["Shadow", "Trunk", "Trunk/Sprite", "Trunk/CollisionShape2D", "Canopy"]:
 		if tree.get_node_or_null(node_path) == null:
 			tree.queue_free()
-			return _fail("Tree source prefab should expose %s." % node_path)
+			return _fail("Tree source prefab %s should expose %s." % [scene_path, node_path])
+
+	if tree.get_node_or_null("OcclusionFadeArea") == null:
+		tree.queue_free()
+		return _fail("Tree source prefab %s should expose OcclusionFadeArea." % scene_path)
 
 	tree.queue_free()
 	return true
 
 
-func _validate_tree_marker() -> bool:
-	var marker := _instantiate(TREE_MARKER_PATH)
+func _validate_tree_marker(scene_path: String) -> bool:
+	var marker := _instantiate(scene_path)
 	if marker == null:
 		return false
 	if marker.get_node_or_null("Preview") == null:
 		marker.queue_free()
-		return _fail("Tree marker should expose editor Preview.")
+		return _fail("Tree marker %s should expose editor Preview." % scene_path)
 	var definition := marker.get("prop_definition") as Resource
 	if definition == null or definition.get("source_scene") == null:
 		marker.queue_free()
-		return _fail("Tree marker should reference a definition with source_scene.")
+		return _fail("Tree marker %s should reference a definition with source_scene." % scene_path)
 	marker.queue_free()
 	return true
 

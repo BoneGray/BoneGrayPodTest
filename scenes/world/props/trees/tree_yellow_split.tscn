@@ -32,13 +32,13 @@ y_sort_enabled = true
 [node name="Shadow" type="Sprite2D" parent="." unique_id=1341556923]
 modulate = Color(1, 1, 1, 0.8)
 z_index = -50
-position = Vector2(0, -4)
+position = Vector2(0, -1)
 texture = SubResource("AtlasTexture_shadow")
 
 [node name="Trunk" type="StaticBody2D" parent="." unique_id=1483821371]
 
 [node name="Sprite" type="Sprite2D" parent="Trunk" unique_id=947960876]
-position = Vector2(0, -19)
+position = Vector2(-1, -15)
 texture = SubResource("AtlasTexture_trunk")
 script = ExtResource("3_sway")
 duration = 3.2
@@ -48,15 +48,13 @@ phase_offset = 0.12
 random_phase_range = 0.45
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Trunk" unique_id=810086294]
-position = Vector2(1, -4)
 shape = SubResource("RectangleShape2D_trunk")
 
 [node name="Canopy" type="Sprite2D" parent="." unique_id=263852390]
 z_index = 100
-position = Vector2(2, -71)
+position = Vector2(0, -68)
 texture = SubResource("AtlasTexture_canopy")
 script = ExtResource("3_sway")
-duration = 2.6
 position_amplitude = Vector2(1.1, 0.25)
 rotation_degrees_amplitude = 1.0
 scale_amplitude = Vector2(0.006, 0.006)
@@ -71,7 +69,7 @@ script = ExtResource("2_fade_area")
 fade_target_path = NodePath("")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="OcclusionFadeArea" unique_id=1551467194]
-position = Vector2(-2, -39)
+position = Vector2(-4, -33)
 shape = SubResource("CapsuleShape2D_dugh5")
 
 [node name="CollisionShape2D2" type="CollisionShape2D" parent="OcclusionFadeArea" unique_id=412970473]

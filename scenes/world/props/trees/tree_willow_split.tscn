@@ -1,0 +1,86 @@
+[gd_scene format=3 uid="uid://oebuxoqpudce"]
+
+[ext_resource type="Texture2D" uid="uid://d0jfiun20ld63" path="res://assets/world/props/forgotten_memories/trees/trees_separated.png" id="1_trees"]
+[ext_resource type="Script" uid="uid://cltxu1ndnv2v4" path="res://scripts/world/props/occlusion_fade_area.gd" id="2_fade_area"]
+[ext_resource type="Script" path="res://scripts/world/props/ambient_sway_2d.gd" id="3_sway"]
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_shadow"]
+atlas = ExtResource("1_trees")
+region = Rect2(355, 528, 182, 105)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_trunk"]
+atlas = ExtResource("1_trees")
+region = Rect2(395, 183, 52, 64)
+
+[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_4u7g6"]
+radius = 7.0
+height = 34.0
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_canopy"]
+atlas = ExtResource("1_trees")
+region = Rect2(327, 5, 179, 161)
+
+[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_occlusion"]
+radius = 31.0
+height = 174.0
+
+[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_lltyb"]
+radius = 30.0
+height = 168.0
+
+[node name="TreeWillowSplit" type="Node2D" unique_id=76828498]
+y_sort_enabled = true
+position = Vector2(26, -25)
+
+[node name="Shadow" type="Sprite2D" parent="." unique_id=1960472596]
+modulate = Color(1, 1, 1, 0.72)
+z_index = -50
+position = Vector2(-26, 51)
+texture = SubResource("AtlasTexture_shadow")
+
+[node name="Trunk" type="StaticBody2D" parent="." unique_id=540027424]
+position = Vector2(-26, 25)
+
+[node name="Sprite" type="Sprite2D" parent="Trunk" unique_id=923039231]
+position = Vector2(0, -2)
+texture = SubResource("AtlasTexture_trunk")
+script = ExtResource("3_sway")
+duration = 3.5
+position_amplitude = Vector2(0.18, 0)
+rotation_degrees_amplitude = 0.25
+phase_offset = 0.1
+random_phase_range = 0.35
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Trunk" unique_id=1828688839]
+position = Vector2(1, 7)
+rotation = 1.5707964
+shape = SubResource("CapsuleShape2D_4u7g6")
+
+[node name="Canopy" type="Sprite2D" parent="." unique_id=958394649]
+z_index = 100
+position = Vector2(-26, -66)
+texture = SubResource("AtlasTexture_canopy")
+script = ExtResource("3_sway")
+duration = 3.0
+position_amplitude = Vector2(1.4, 0.3)
+rotation_degrees_amplitude = 0.8
+scale_amplitude = Vector2(0.004, 0.004)
+phase_offset = 0.44
+
+[node name="OcclusionFadeArea" type="Area2D" parent="." unique_id=1917500924]
+position = Vector2(-26, -56)
+collision_layer = 0
+collision_mask = 2
+monitorable = false
+script = ExtResource("2_fade_area")
+fade_target_path = NodePath("")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="OcclusionFadeArea" unique_id=1247396569]
+position = Vector2(3, 3)
+rotation = 1.5707964
+skew = 0.27925268
+shape = SubResource("CapsuleShape2D_occlusion")
+
+[node name="CollisionShape2D2" type="CollisionShape2D" parent="OcclusionFadeArea" unique_id=1224885194]
+position = Vector2(0, -1)
+shape = SubResource("CapsuleShape2D_lltyb")

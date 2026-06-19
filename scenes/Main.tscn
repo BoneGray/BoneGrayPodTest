@@ -4,7 +4,9 @@
 [ext_resource type="PackedScene" path="res://scenes/world/props/trees/tree_pine_placement_marker.tscn" id="2_c01mt"]
 [ext_resource type="PackedScene" uid="uid://cid64ugn1d0ua" path="res://scenes/characters/player.tscn" id="2_rvslj"]
 [ext_resource type="Script" uid="uid://dxhg5ioo3crwh" path="res://scripts/camera_follow_target.gd" id="3_5gc6h"]
+[ext_resource type="PackedScene" path="res://scenes/world/props/trees/tree_blue_placement_marker.tscn" id="4_nxtc6"]
 [ext_resource type="Script" uid="uid://r3enqxmtn0cn" path="res://scripts/world/tilemap_navigation_region_builder.gd" id="5_0xw7e"]
+[ext_resource type="PackedScene" path="res://scenes/world/props/trees/tree_orange_placement_marker.tscn" id="5_jlsqs"]
 [ext_resource type="PackedScene" path="res://scenes/world/props/trees/tree_yellow_placement_marker.tscn" id="9_tree_marker"]
 
 [node name="Main" type="Node2D" unique_id=1704339694]
@@ -31,7 +33,7 @@ tile_set = ExtResource("1_elqb8")
 [node name="CompoundPropMarkers" type="Node2D" parent="." unique_id=296595694]
 
 [node name="TreePine" parent="CompoundPropMarkers" unique_id=1478246984 instance=ExtResource("2_c01mt")]
-position = Vector2(203, 129)
+position = Vector2(341, 224)
 
 [node name="TreeYellow2" parent="CompoundPropMarkers" unique_id=232175113 instance=ExtResource("9_tree_marker")]
 position = Vector2(145, 15)
@@ -47,6 +49,12 @@ position = Vector2(337, 15)
 
 [node name="TreeYellow5" parent="CompoundPropMarkers" unique_id=631634867 instance=ExtResource("9_tree_marker")]
 position = Vector2(289, 15)
+
+[node name="TreeBlue" parent="CompoundPropMarkers" unique_id=1024917945 instance=ExtResource("4_nxtc6")]
+position = Vector2(334, 74)
+
+[node name="TreeOrange" parent="CompoundPropMarkers" unique_id=2011678662 instance=ExtResource("5_jlsqs")]
+position = Vector2(335, 148)
 
 [node name="ShadowLayer" type="Node2D" parent="." unique_id=310260513]
 z_index = -50
