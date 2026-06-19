@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://be5t5plly5kbd"
-path="res://.godot/imported/pistol_world.png-fdacf9e8a1b1b2ab483ab63676a38107.ctex"
+uid="uid://d0jfiun20ld63"
+path="res://.godot/imported/trees_separated.png-7f36892e365ad63e5bb60e223e756d34.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/equipment/weapons/pistol/pistol_world.png"
-dest_files=["res://.godot/imported/pistol_world.png-fdacf9e8a1b1b2ab483ab63676a38107.ctex"]
+source_file="res://assets/world/props/forgotten_memories/trees/trees_separated.png"
+dest_files=["res://.godot/imported/trees_separated.png-7f36892e365ad63e5bb60e223e756d34.ctex"]
 
 [params]
 

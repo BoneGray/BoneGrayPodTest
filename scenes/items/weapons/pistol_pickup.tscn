@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" path="res://scripts/items/pickup_item.gd" id="1_pickup_script"]
 [ext_resource type="Resource" path="res://resources/equipment/weapons/pistol/pistol_data.tres" id="2_weapon_data"]
-[ext_resource type="Texture2D" path="res://assets/equipment/weapons/pistol/pistol_world.png" id="3_world_texture"]
+[ext_resource type="Texture2D" path="res://resources/equipment/pickups/pistol_world_texture.tres" id="3_world_texture"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_pickup"]
 size = Vector2(12, 8)

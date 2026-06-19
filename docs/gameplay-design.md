@@ -3,6 +3,10 @@
 This document records gameplay-facing design decisions and open questions.
 Keep detailed implementation rules in `docs/development-guidelines.md`.
 
+## Content Design Documents
+
+- `docs/chapter-1-design-brief.md`: 第一章内容大纲，记录家园外围、安全区、医院线索和未知文明伏笔的章节方向。
+
 ## Player Characters And Equipment
 
 Player character logic must not assume every playable character can replace weapons or use tools.

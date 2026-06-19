@@ -232,3 +232,35 @@ CharacterBody2D
 - 后续涉及可复用系统、同类资源扩展、武器、工具、消耗品、敌人、角色、拾取物、攻击方式或渲染层级时，先参考 `docs/professional-game-development-guidelines.md`。
 - 新需求默认先抽象公共概念，再接入当前资源；不要为了当前单个资源写一次性专属逻辑。
 - 当前拾取系统基线是 `ItemData -> WeaponData` 和 `PickupItem.item_data`。新武器、工具、消耗品和弹药都应优先接入这条公共路径。
+
+## PNG Import And Atlas Rules
+
+新增单张或少量 PNG 时，不应直接把散图放进运行时目录后立即引用。先按以下流程处理：
+
+1. 先分析资源用途，判断它属于角色动画、地面拾取物、UI、地形瓦块、建筑部件、场景装饰、特效还是投射物。
+2. 再判断它应该放入已有目录、已有 atlas，还是需要新建一组 atlas。
+3. 对地面拾取物、UI 图标、道具小图、建筑小件、自然装饰和小特效，优先合入对应 atlas，并生成或更新 `AtlasTexture` `.tres`。
+4. 已存在 atlas 的坐标必须保持稳定。新增资源默认追加到 atlas 的末尾或下一行，不自动重排旧资源坐标。
+5. 每个 atlas 必须维护 manifest，记录 atlas 路径、是否 append-only，以及每个子图的 `x/y/w/h`。
+6. 游戏逻辑、`ItemData`、场景和资源文件应引用 `AtlasTexture` `.tres`，不要直接记录 atlas 坐标。
+7. 引用全部切换到 `.tres` 后，旧的运行时散图和对应 `.import` 可以删除。
+8. 手持武器动画、角色动画、大型 sprite sheet、TileSet 原图不强制合进通用 atlas；它们应按 SpriteFrames 或 TileSet 工作流处理。
+
+当前推荐结构：
+
+```text
+assets/equipment/pickups/pickup_items_atlas.png
+assets/equipment/pickups/pickup_items_atlas_manifest.json
+resources/equipment/pickups/item_name_world_texture.tres
+```
+
+追加新拾取物示例：
+
+```text
+新增 food.png
+-> 判断为地面拾取物
+-> 追加进 pickup_items_atlas.png
+-> 更新 pickup_items_atlas_manifest.json
+-> 新增 food_world_texture.tres
+-> ItemData.world_texture 引用 food_world_texture.tres
+```

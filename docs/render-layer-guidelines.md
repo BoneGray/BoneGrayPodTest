@@ -9,6 +9,8 @@
 - 角色内部层级决定身体、头、手、武器、攻击特效之间谁挡谁。
 - 世界遮挡优先由 `YSort` 解决；角色内部遮挡优先由角色 Visual 逻辑按方向/动画解决。
 - 不通过把角色内部节点调到很高的正 `z_index` 来修局部问题，否则会破坏世界遮挡。
+- 可复用场景资源必须保持完整、可检查的节点结构；禁止资源脚本在编辑器或运行时私自 `reparent` 自身子节点来适配世界层级。
+- 树木、建筑、家具等需要跨层显示的复合物件，必须先保持完整 prefab，再由统一放置器、构建器或明确的场景层级规范处理跨层拆分。
 
 ## 世界层级
 
@@ -22,6 +24,10 @@ World
 |   +-- Road
 |   +-- River
 |   +-- GroundTile
++-- ShadowLayer
+|   +-- BuildingShadow
+|   +-- TreeShadow
+|   +-- CloudShadow
 +-- WorldActors
 |   +-- GroundProps
 |   +-- Pickups
@@ -102,8 +108,31 @@ World
 规则：
 
 - 玩家、敌人、装备、地上物、飞行物在高层遮挡区域下方时，应一起被遮挡。
-- 树应拆成两个逻辑部分：树干进入 WorldActors，树冠进入 HighOverlay。
+- 树应拆成两个逻辑部分：树干进入 WorldActors，树冠进入 HighOverlay；但拆分不得由树资源自身脚本偷偷搬节点完成。
 - 建筑也应拆成底部/墙体/屋顶：可交互或可遮挡主体进入 WorldActors，屋顶和天花板进入 HighOverlay。
+
+## 可复用场景资源结构
+
+树木、建筑、家具、车辆、可交互大型物件这类会反复拖入地图的资源，必须遵守以下规则：
+
+- 资源场景本身必须保持完整结构，打开 `.tscn` 时应能看到全部关键节点。
+- 资源场景不允许依赖 `@tool`、`_ready()` 或运行时脚本把自身子节点搬到其他父节点。
+- 资源场景可以暴露锚点、碰撞、视觉部件和配置，但不能把世界层级职责藏在资源内部。
+- 如果一个资源需要同时进入 `WorldActors`、`ShadowLayer`、`HighOverlay` 等多个世界层，必须使用统一的场景放置/构建流程生成最终层级。
+- 第一次接入新类型资源时，先做一个样板资源和样板场景验证；验证通过后再批量导入同类资源。
+
+树木资源的基础结构：
+
+```text
+TreeXxx.tscn
++-- Shadow
++-- Trunk
+|   +-- Sprite
+|   +-- CollisionShape2D
++-- Canopy
+```
+
+在资源场景里，`Trunk`、`Canopy`、`Shadow` 必须始终可见；任何让它们在编辑器场景树里消失的实现都不合格。
 
 ### WorldEffects
 
@@ -187,6 +216,8 @@ CharacterBody2D
 - 不要让树冠、屋顶、天花板参与和角色同一套 YSort。
 - 不要把地板、马路、河流放进 WorldActors。
 - 不要用调试障碍物的临时层级规则作为正式地图层级规则。
+- 不要让可复用资源通过脚本自动修改自己的父子层级结构。
+- 不要因为单个样板场景看起来正确，就把临时拆层脚本扩散成正式资源流程。
 
 ## 验证要求
 
@@ -206,3 +237,86 @@ CharacterBody2D
 - 再选样板场景验证。
 - 最后逐个迁移正式场景。
 - `navigation_obstacle_test_scene` 是当前第一版样板场景，不是为它单独写特例。
+
+## 复合物体摆放层级方案
+
+树木、建筑、墙体、家具、车辆、屋顶、天花板这类复合物体不能直接当作一个普通 `WorldActors` 子节点处理，因为它们内部经常同时包含低层阴影、世界排序主体和高层覆盖部分。
+
+正式流程分成两类资源：
+
+```text
+SourcePrefab
++-- Shadow
++-- Trunk / Body / Wall
++-- Canopy / Roof / Ceiling
+
+RuntimeGeneratedParts
++-- Shadow      -> ShadowLayer
++-- Trunk       -> WorldActors
++-- Canopy      -> HighOverlay
+```
+
+规则：
+
+- `SourcePrefab` 是美术和结构的完整源资源，打开 `.tscn` 时必须能看到完整节点结构。
+- `RuntimeGeneratedParts` 是 marker 运行时从完整源资源复制出来的分层节点，每个节点明确进入对应世界层。
+- `WorldActors` 里的排序部分必须是直接子节点，不能藏在一个整体 prefab 里面，否则 YSort 只会排序整体 prefab，不会排序树干/墙体和 Player。
+- 禁止用 `@tool`、`_ready()`、运行时脚本或调试脚本把源资源的子节点偷偷 `reparent` 到其他层。
+- 新增同类资源时，先做一个样板资源验证层级，再批量生成同类 part。
+
+树木当前标准：
+
+```text
+tree_yellow_split.tscn              # 唯一需要维护的完整源资源
+tree_yellow_placement_marker.tscn   # 地图里拖放的放置点，运行时从源资源生成三层
+```
+
+### 复合物体放置流程
+
+地图中不要直接拖 `tree_yellow_split.tscn` 这类完整源资源作为正式物体。正式摆放时使用 placement marker：
+
+```text
+CompoundPropMarkers
++-- TreeYellow      # 只负责表示“一棵树”的位置
++-- TreeYellow2
+```
+
+构建工具读取 marker 后生成真正参与渲染的三层节点：
+
+```text
+ShadowLayer/TreeShadowLayer/TreeYellowShadow
+WorldActors/TreeYellowTrunk
+HighOverlay/TreeCanopyLayer/TreeYellowCanopy
+```
+
+当前样板资源：
+
+```text
+resources/world/props/trees/tree_yellow_compound_prop.tres
+scenes/world/props/trees/tree_yellow_placement_marker.tscn
+tools/build_compound_prop_layers.gd
+```
+
+使用规则：
+
+- 日常编辑时移动 `CompoundPropMarkers` 下的 marker，marker 表示整棵树的摆放点。
+- marker 可以包含编辑器预览图，方便搭场景时看到物体大致位置；预览只用于编辑器，运行时会被移除，不参与正式碰撞或层级。
+- 正式提交或测试前，运行构建工具同步生成 `ShadowLayer`、`WorldActors`、`HighOverlay` 的实际节点。
+- 生成出的 `WorldActors/*Trunk` 才参与角色 YSort；marker 本身不参与战斗、碰撞或渲染。
+- 如果后续新增树、建筑或屋顶，先新增对应 `CompoundPropDefinition`，再新增 marker 场景，不要复制临时拆层逻辑。
+
+### 源资源维护规则
+
+完整源资源是复合物体的 source of truth。以 `tree_yellow_split.tscn` 为例：
+
+- 调整 `Shadow` 会影响运行时生成到 `ShadowLayer` 的树影。
+- 调整 `Trunk/Sprite` 和 `Trunk/CollisionShape2D` 会影响运行时生成到 `WorldActors` 的树干和碰撞。
+- 调整 `Canopy` 会影响运行时生成到 `HighOverlay` 的树冠。
+
+当前运行时 marker 会优先读取 `CompoundPropDefinition.source_scene`，直接从完整源资源生成正式三层。因此日常搭场景和运行测试时，只要修改 `tree_yellow_split.tscn`，运行时生成的树影、树干碰撞和树冠位置都会跟着变化。
+
+规则：
+
+- 日常调整先改完整源资源。
+- marker 运行时优先从完整源资源生成正式三层。
+- 不再维护 `tree_yellow_shadow_part.tscn`、`tree_yellow_trunk_actor.tscn`、`tree_yellow_canopy_part.tscn` 这类静态 part，避免源资源和运行资源漂移。

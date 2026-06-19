@@ -35,6 +35,7 @@
 ```text
 SceneRoot
 +-- TerrainLayer
++-- ShadowLayer
 +-- WorldActors
 +-- WorldEffects
 +-- HighOverlay
@@ -45,6 +46,7 @@ SceneRoot
 
 - `WorldActors.y_sort_enabled = true`
 - `TerrainLayer.z_index = RenderLayers.TERRAIN_Z`
+- `ShadowLayer.z_index = RenderLayers.SHADOW_Z`
 - `WorldActors.z_index = RenderLayers.WORLD_Y_SORT_Z`
 - `WorldEffects.z_index = RenderLayers.WORLD_EFFECTS_Z`
 - `HighOverlay.z_index = RenderLayers.HIGH_OVERLAY_Z`
@@ -105,3 +107,13 @@ SceneRoot
 - 人物在树干上方和下方的遮挡。
 - 树冠覆盖玩家、敌人、武器和飞行物。
 - 屋顶/天花板覆盖整个角色，包括手部和武器。
+
+## 复合物体迁移流程补充
+
+复合物体使用“完整源资源 + 明确分层摆放 part”的流程。
+
+- 完整源资源用于保留美术结构和后续生成参考。
+- 分层摆放 part 才进入正式场景：阴影进入 `ShadowLayer`，树干/主体进入 `WorldActors`，树冠/屋顶进入 `HighOverlay`。
+- `WorldActors` 中需要和角色互相遮挡的部分必须作为直接子节点参与 YSort。
+- 不再允许复合物体通过自身脚本在编辑器或运行时偷偷移动子节点来修层级。
+- 地图编辑时移动 `CompoundPropMarkers` 下的 marker；运行 `tools/build_compound_prop_layers.gd` 后生成或刷新正式层级节点。

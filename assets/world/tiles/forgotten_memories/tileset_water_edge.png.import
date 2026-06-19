@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://ilcnhacmvujr"
-path="res://.godot/imported/gun_world.png-2fcfaa2a5d78fb7d52c0acf709d6a8f7.ctex"
+uid="uid://d4guxi0davrnw"
+path="res://.godot/imported/tileset_water_edge.png-c91838c5f874ebc08e5c918497a92d74.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/equipment/weapons/gun/gun_world.png"
-dest_files=["res://.godot/imported/gun_world.png-2fcfaa2a5d78fb7d52c0acf709d6a8f7.ctex"]
+source_file="res://assets/world/tiles/forgotten_memories/tileset_water_edge.png"
+dest_files=["res://.godot/imported/tileset_water_edge.png-c91838c5f874ebc08e5c918497a92d74.ctex"]
 
 [params]
 

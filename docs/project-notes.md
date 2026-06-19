@@ -32,6 +32,29 @@ Asset import note:
 - For animated sprite sheets, prefer file names like `zombie_big_attack_down_second_sheet15.png`.
 - Generated Godot animation names should remove the object prefix and use names like `attack_down_second`.
 - For terrain, buildings, props, UI, and effects, use the general image naming format from `docs/development-guidelines.md`.
+- New small runtime PNGs should be evaluated for an existing atlas before being referenced directly.
+
+## Current Pickup Atlas
+
+Ground pickup weapon icons currently use an append-only atlas.
+
+Atlas files:
+
+- `res://assets/equipment/pickups/pickup_items_atlas.png`
+- `res://assets/equipment/pickups/pickup_items_atlas_manifest.json`
+
+AtlasTexture resources:
+
+- `res://resources/equipment/pickups/baseball_bat_world_texture.tres`
+- `res://resources/equipment/pickups/gun_world_texture.tres`
+- `res://resources/equipment/pickups/pistol_world_texture.tres`
+- `res://resources/equipment/pickups/shotgun_world_texture.tres`
+
+Rules:
+
+- Existing atlas regions are stable and should not be repacked.
+- New pickup PNGs, such as food, bandages, or ammo, should be appended to the current atlas unless a new category atlas is intentionally created.
+- `WeaponData.world_texture`, `ItemData.world_texture`, and pickup scenes should reference the `.tres` AtlasTexture resources, not the old scattered PNGs.
 
 ## Background TileSet Variants
 
@@ -54,6 +77,36 @@ Rule source:
 - `background_dark_green_tileset.tres` and `background_green_tileset.tres` were generated from `background_bleak_yellow_tileset.tres`.
 - They keep the same atlas tile coordinates, `Terrain Set 0`, `Terrain 0`, and peering bits.
 - Only the texture reference changes.
+
+## Forgotten Memories TileSets
+
+Imported terrain experiment assets:
+
+- `res://assets/world/tiles/forgotten_memories/tileset_environment_forgotten_memories.png`
+- `res://assets/world/tiles/forgotten_memories/tileset_water_forgotten_memories_sheet6.png`
+
+Generated TileSet resources:
+
+- `res://resources/tiles/forgotten_memories_water_tileset.tres`
+
+Water animation rules:
+
+- Tile size is `32x32`.
+- Keep this water source at native size; direct downscaling to `16x16` makes the water detail noisy.
+- Water tiles use 6 horizontal frames.
+- Animation starts are placed at atlas columns `0, 6, 12, 18, 24` where the 6-frame strip has visible pixels.
+- Each frame duration is `0.16` seconds.
+- Use `res://resources/tiles/forgotten_memories_water_tileset.tres` for this water layer.
+- Regenerate with `res://tools/create_forgotten_memories_water_tileset.gd` when the water sheet changes.
+
+Navigation rule:
+
+- TileMap layers that represent blocking terrain, such as rivers, pits, lava, or other impassable ground, must also feed a `NavigationRegion2D`.
+- Use `res://scripts/world/tilemap_navigation_region_builder.gd` when the blocking information can come from a `TileMapLayer`.
+- The builder reads TileSet physics collision by default, so decorative or shoreline cells without physics collision can remain walkable.
+- Only disable `use_tile_physics_as_blockers` when the whole configured `TileMapLayer` is intentionally a pure blocker layer.
+- Tune `margin_cells` per scene to decide how far around the blocking TileMap enemies can pathfind.
+- Tune `blocker_padding_cells` when enemies move too close to the edge of water, walls, or other blocking terrain.
 
 ## Current Gameplay Test Scene
 

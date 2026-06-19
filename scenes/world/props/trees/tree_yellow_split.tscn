@@ -1,0 +1,42 @@
+[gd_scene format=3 uid="uid://dqjs5kilqs6jq"]
+
+[ext_resource type="Texture2D" uid="uid://d0jfiun20ld63" path="res://assets/world/props/forgotten_memories/trees/trees_separated.png" id="1_trees"]
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_shadow"]
+atlas = ExtResource("1_trees")
+region = Rect2(226, 549, 38, 29)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_trunk"]
+atlas = ExtResource("1_trees")
+region = Rect2(198, 153, 19, 35)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_trunk"]
+size = Vector2(18, 5.5)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_canopy"]
+atlas = ExtResource("1_trees")
+region = Rect2(196, 48, 56, 84)
+
+[node name="TreeYellowSplit" type="Node2D" unique_id=1373043663]
+y_sort_enabled = true
+
+[node name="Shadow" type="Sprite2D" parent="." unique_id=1341556923]
+modulate = Color(1, 1, 1, 0.8)
+z_index = -50
+position = Vector2(0, -4)
+texture = SubResource("AtlasTexture_shadow")
+
+[node name="Trunk" type="StaticBody2D" parent="." unique_id=1483821371]
+
+[node name="Sprite" type="Sprite2D" parent="Trunk" unique_id=947960876]
+position = Vector2(0, -19)
+texture = SubResource("AtlasTexture_trunk")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Trunk" unique_id=810086294]
+position = Vector2(1, -4)
+shape = SubResource("RectangleShape2D_trunk")
+
+[node name="Canopy" type="Sprite2D" parent="." unique_id=263852390]
+z_index = 100
+position = Vector2(2, -71)
+texture = SubResource("AtlasTexture_canopy")

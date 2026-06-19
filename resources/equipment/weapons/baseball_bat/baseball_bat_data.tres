@@ -1,20 +1,19 @@
-[gd_resource type="Resource" script_class="WeaponData" load_steps=7 format=3]
+[gd_resource type="Resource" script_class="WeaponData" format=3 uid="uid://b5frqym6v8s06"]
 
-[ext_resource type="Script" path="res://scripts/equipment/weapon_data.gd" id="1_weapon_data"]
-[ext_resource type="Texture2D" path="res://assets/equipment/weapons/baseball_bat/baseball_bat_world.png" id="2_world"]
-[ext_resource type="Texture2D" path="res://assets/equipment/weapons/baseball_bat/baseball_bat_icon.png" id="3_icon"]
-[ext_resource type="SpriteFrames" path="res://resources/equipment/weapons/baseball_bat/baseball_bat_sprite_frames.tres" id="4_frames"]
-[ext_resource type="Resource" path="res://resources/equipment/weapons/baseball_bat/baseball_bat_primary_attack.tres" id="5_primary"]
+[ext_resource type="Script" uid="uid://c7bci1o77ogwu" path="res://scripts/equipment/weapon_data.gd" id="1_weapon_data"]
+[ext_resource type="Texture2D" path="res://resources/equipment/pickups/baseball_bat_world_texture.tres" id="2_world"]
+[ext_resource type="Texture2D" uid="uid://5vlwx7j3cew3" path="res://assets/equipment/weapons/baseball_bat/baseball_bat_icon.png" id="3_icon"]
+[ext_resource type="SpriteFrames" uid="uid://bs1n1rvoy0l50" path="res://resources/equipment/weapons/baseball_bat/baseball_bat_sprite_frames.tres" id="4_frames"]
+[ext_resource type="Resource" uid="uid://bw8g5p038tfim" path="res://resources/equipment/weapons/baseball_bat/baseball_bat_primary_attack.tres" id="5_primary"]
 [ext_resource type="Resource" path="res://resources/equipment/weapons/baseball_bat/baseball_bat_secondary_attack.tres" id="6_secondary"]
 
 [resource]
 script = ExtResource("1_weapon_data")
 weapon_id = "baseball_bat"
-display_name = "Baseball Bat"
-weapon_type = "melee"
-world_texture = ExtResource("2_world")
-icon_texture = ExtResource("3_icon")
 visual_sprite_frames = ExtResource("4_frames")
-pickup_scene_path = "res://scenes/items/weapons/baseball_bat_pickup.tscn"
 primary_attack_profile = ExtResource("5_primary")
 secondary_attack_profile = ExtResource("6_secondary")
+display_name = "Baseball Bat"
+world_texture = ExtResource("2_world")
+icon_texture = ExtResource("3_icon")
+pickup_scene_path = "res://scenes/items/weapons/baseball_bat_pickup.tscn"

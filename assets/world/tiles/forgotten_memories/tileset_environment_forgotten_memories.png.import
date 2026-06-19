@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bd3wus2ii7qlj"
-path="res://.godot/imported/shotgun_world.png-bb1cbf5391906bddfbec0765a360549a.ctex"
+uid="uid://bjykeaxjkhhgx"
+path="res://.godot/imported/tileset_environment_forgotten_memories.png-0b7a7e983a894b228693bfe38f5c3261.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/equipment/weapons/shotgun/shotgun_world.png"
-dest_files=["res://.godot/imported/shotgun_world.png-bb1cbf5391906bddfbec0765a360549a.ctex"]
+source_file="res://assets/world/tiles/forgotten_memories/tileset_environment_forgotten_memories.png"
+dest_files=["res://.godot/imported/tileset_environment_forgotten_memories.png-0b7a7e983a894b228693bfe38f5c3261.ctex"]
 
 [params]
 

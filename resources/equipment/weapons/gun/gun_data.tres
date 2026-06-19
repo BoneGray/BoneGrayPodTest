@@ -1,7 +1,7 @@
 [gd_resource type="Resource" script_class="WeaponData" format=3 uid="uid://chy8vu67s0sgp"]
 
 [ext_resource type="Script" uid="uid://c7bci1o77ogwu" path="res://scripts/equipment/weapon_data.gd" id="1_weapon_data"]
-[ext_resource type="Texture2D" uid="uid://ilcnhacmvujr" path="res://assets/equipment/weapons/gun/gun_world.png" id="3_icon"]
+[ext_resource type="Texture2D" path="res://resources/equipment/pickups/gun_world_texture.tres" id="3_icon"]
 [ext_resource type="SpriteFrames" uid="uid://7v5rgf6jv4w5" path="res://resources/equipment/weapons/gun/gun_sprite_frames.tres" id="4_frames"]
 [ext_resource type="Resource" uid="uid://bled2l7ij0pd8" path="res://resources/equipment/weapons/gun/gun_primary_attack.tres" id="5_primary"]
 

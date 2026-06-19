@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://5adti70e7evi"
-path="res://.godot/imported/baseball_bat_world.png-c625b9be1c8e8c3782b4105a5d0cd26a.ctex"
+uid="uid://d3w68mutbuvuw"
+path="res://.godot/imported/tileset_water_forgotten_memories_sheet6.png-550c3fc6abc8b47e14fa7751ffd68017.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/equipment/weapons/baseball_bat/baseball_bat_world.png"
-dest_files=["res://.godot/imported/baseball_bat_world.png-c625b9be1c8e8c3782b4105a5d0cd26a.ctex"]
+source_file="res://assets/world/tiles/forgotten_memories/tileset_water_forgotten_memories_sheet6.png"
+dest_files=["res://.godot/imported/tileset_water_forgotten_memories_sheet6.png-550c3fc6abc8b47e14fa7751ffd68017.ctex"]
 
 [params]
 
