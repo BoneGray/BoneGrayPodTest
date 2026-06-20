@@ -2,7 +2,7 @@
 
 [ext_resource type="Texture2D" uid="uid://d0jfiun20ld63" path="res://assets/world/props/forgotten_memories/trees/trees_separated.png" id="1_trees"]
 [ext_resource type="Script" uid="uid://cltxu1ndnv2v4" path="res://scripts/world/props/occlusion_fade_area.gd" id="2_fade_area"]
-[ext_resource type="Script" path="res://scripts/world/props/ambient_sway_2d.gd" id="3_sway"]
+[ext_resource type="Script" uid="uid://deudjuyswb58f" path="res://scripts/world/props/ambient_sway_2d.gd" id="3_sway"]
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_shadow"]
 atlas = ExtResource("1_trees")
@@ -25,7 +25,6 @@ height = 80.0
 
 [node name="TreePineSplit" type="Node2D" unique_id=450491976]
 y_sort_enabled = true
-position = Vector2(0, 4)
 
 [node name="Shadow" type="Sprite2D" parent="." unique_id=2109580259]
 modulate = Color(1, 1, 1, 0.75)

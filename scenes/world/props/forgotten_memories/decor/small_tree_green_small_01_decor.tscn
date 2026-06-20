@@ -1,0 +1,16 @@
+[gd_scene format=3 uid="uid://43iyf2pay6i5"]
+
+[ext_resource type="Texture2D" path="res://resources/world/props/forgotten_memories/decor/small_tree_green_small_01_texture.tres" id="1_texture"]
+[ext_resource type="Script" uid="uid://deudjuyswb58f" path="res://scripts/world/props/ambient_sway_2d.gd" id="2_sway"]
+
+[node name="SmallTreeGreenSmall01Decor" type="Sprite2D" unique_id=1360766054]
+y_sort_enabled = true
+position = Vector2(5.9604645e-08, -5.9999995)
+scale = Vector2(0.495, 0.495)
+texture = ExtResource("1_texture")
+offset = Vector2(0, -27)
+script = ExtResource("2_sway")
+duration = 3.2
+rotation_degrees_amplitude = 0.55
+scale_amplitude = Vector2(0.006, 0.004)
+random_phase_range = 0.85

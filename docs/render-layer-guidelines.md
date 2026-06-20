@@ -397,7 +397,9 @@ TreeXxx.tscn
 
 规则：
 - 摆动只作用在视觉节点上，例如 `Trunk/Sprite`、`Canopy`、草叶 Sprite、布条 Sprite。
-- 不要摆动 `StaticBody2D`、`CollisionShape2D`、`Area2D`、`OcclusionFadeArea` 或参与 YSort 的主体根节点。
+- 不要摆动 `StaticBody2D`、`CollisionShape2D`、`Area2D` 或 `OcclusionFadeArea`。
+- A 类复合物体不要把 `AmbientSway2D` 挂在参与 YSort 的主体根节点上，应挂在主体内部的可见 Sprite 上。
+- B 类单体物体的根节点本身就是 `Sprite2D` 时，可以把 `AmbientSway2D` 挂在根节点上，但 `position_amplitude` 必须保持 `Vector2.ZERO`，避免动画改变 YSort 排序点。
 - 树干、墙体主体这类实体视觉只能轻微摆动；树冠、草叶、藤蔓这类柔性视觉可以更明显。
 - 同类物体应使用 `randomize_phase` 或 `phase_offset` 错开摆动，避免整片场景同步摇动。
 - 摆动参数必须作为 Inspector 可调属性暴露，并使用中文 `##` 注释说明用途。
@@ -443,6 +445,68 @@ scenes/world/props/trees/tree_xxx_split.tscn
 - `Split` 场景是唯一需要维护的完整源资源，打开 `.tscn` 时必须能看到完整结构。
 - 地图里拖放 `PlacementMarker`，不要直接把 `Split` 场景当正式物体放进 `WorldActors`。
 - `CompoundPropDefinition` 负责配置生成路径、透明度和跨层淡化规则。
-- `AmbientSway2D` 只能挂视觉节点，不能挂碰撞节点、遮挡检测区域或参与 YSort 的主体根节点。
+- `AmbientSway2D` 只能挂视觉节点，不能挂碰撞节点或遮挡检测区域；A 类复合物体不能挂在参与 YSort 的主体根节点上。
 - `OcclusionFadeArea` 和视觉节点平级，表达“整个复合物体的遮挡检测”，不要藏在 `Canopy` 里。
 - 同类资源新增前，先复制模板并改资源引用、碰撞范围、遮挡范围和摆动参数；不要复制运行时生成节点作为源资源。
+## B 类单体 YSort 物体规则
+
+B 类物体指会和玩家、敌人、地面物品发生前后遮挡关系，但不需要拆成 `ShadowLayer`、`WorldActors`、`HighOverlay` 多层的普通物体，例如小树、灌木、普通石块、树桩、箱子、低矮装饰物。
+
+这类物体的标准结构是：
+
+```text
+SmallPropXxx.tscn
++-- Sprite2D 根节点
+```
+
+规则：
+
+- 根节点必须是实际参与渲染的 `Sprite2D`，不能使用空 `Node2D` 根节点再挂一个子 `Sprite2D` 作为正式 YSort 物体。
+- 根节点的位置就是地图摆放点，也是 YSort 排序点，通常放在物体和地面接触的底部中心。
+- 可以使用根 `Sprite2D.offset` 调整图片相对排序点的绘制位置，但不要通过子 `Sprite2D.position` 或子 `Sprite2D.offset` 调整正式可排序物体。
+- 如果 B 类单体需要呼吸、摆动等环境动画，可以直接在根 `Sprite2D` 上挂 `AmbientSway2D`；只允许使用 `rotation_degrees_amplitude` 和很小的 `scale_amplitude`，默认不使用 `position_amplitude`。
+- 如果物体需要碰撞，但仍然是单体 B 类物体，优先使用 `StaticBody2D` 作为根节点，并确保实际参与 YSort 的可见主体和根排序点保持同一套约束；如果发现渲染排序受子 Sprite 影响，应升级为明确的 B 类模板或 A 类复合物体方案。
+- 如果物体有树冠、屋顶、天花板、上层遮挡、透明淡化等跨层需求，不再属于 B 类，应升级为 A 类复合物体，走 `Split + PlacementMarker + CompoundPropDefinition` 流程。
+
+禁止结构：
+
+```text
+SmallPropXxx.tscn
++-- Node2D 空根节点
+    +-- Sprite2D
+```
+
+这个结构会让“地图排序点”和“实际渲染节点”分离，编辑时看起来根节点在正确地面位置，但实际遮挡可能跟随子 `Sprite2D` 的绘制位置变化，导致 YSort 判断不稳定。
+
+## B+ 灌木和可穿过植物规则
+
+B+ 物体指比普通 B 类装饰多一层玩家反馈，但仍不需要拆成 `ShadowLayer`、`WorldActors`、`HighOverlay` 的低矮可穿过植物，例如灌木、草丛、低矮花丛。
+
+标准结构：
+
+```text
+BushXxxDecor(Sprite2D)
++-- InteractionArea
+    +-- CollisionShape2D
+```
+
+规则：
+
+- 根节点必须是实际参与渲染和 YSort 的 `Sprite2D`，根节点位置是地面排序点。
+- 图片用根 `Sprite2D.offset` 对齐到底部排序点，不使用空 `Node2D` 根节点和子 Sprite。
+- 灌木常驻呼吸、风吹摆动、进出拨动由 `BushDecor` 控制，不为单棵灌木写专属脚本。
+- 常驻动画和拨动动画只改变视觉旋转、缩放和透明度，不改变根节点 `position`。
+- 透明度使用 `normal_alpha` 和 `faded_alpha` 配置。
+- 进入和离开是两套独立逻辑：进入使用 `enter_shake_*` 参数，离开使用 `exit_shake_*` 参数；后续音效也应分别接 `bush_entered` 和 `bush_exited` 信号。
+- `InteractionArea` 只负责检测候选对象是否位于灌木范围内，不直接等同于“进入灌木”。
+- 真实进入灌木必须同时满足：对象在 `InteractionArea` 内，并且对象的世界 Y 小于灌木根节点世界 Y；当对象 Y 大于灌木根节点世界 Y 时，即使还在检测区域内，也应视为已经走到灌木前方并离开灌木。
+- 玩家真实进入时灌木应降低透明度并触发进入抖动；玩家真实离开时恢复透明度并触发离开抖动。
+- 如果某个植物需要阻挡移动、拆树冠、做高层遮挡或复杂淡化，应升级为 A 类复合物体，不继续套用 B+。
+
+当前模板：
+
+```text
+scripts/world/props/bush_decor.gd
+scenes/world/props/forgotten_memories/decor/bush_green_round_01_decor.tscn
+resources/world/props/forgotten_memories/decor/bush_green_round_01_texture.tres
+```

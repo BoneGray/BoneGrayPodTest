@@ -13,10 +13,10 @@ class_name AmbientSway2D
 ## 完成一次完整摆动循环所用的秒数，数值越大摆动越慢。
 @export_range(0.1, 20.0, 0.01) var duration := 2.6
 
-## 位置摆动幅度，单位为像素；通常树冠的 X 值可以比树干略大。
+## 位置摆动幅度，单位为像素；挂在参与 YSort 的根节点时通常保持为 Vector2.ZERO。
 @export var position_amplitude := Vector2.ZERO
 
-## 旋转摆动幅度，单位为角度；建议树干小于树冠。
+## 旋转摆动幅度，单位为角度；实体主体建议很小，柔性树冠、草叶可稍大。
 @export_range(0.0, 10.0, 0.01) var rotation_degrees_amplitude := 0.0
 
 ## 缩放呼吸幅度；例如 Vector2(0.01, 0.01) 表示最多放大约 1%。

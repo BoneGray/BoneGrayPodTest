@@ -1,9 +1,9 @@
-[gd_resource type="TileSet" format=3 uid="uid://jtofupj1n278"]
+[gd_resource type="TileSet" format=3 uid="uid://bltv28gv5gc2n"]
 
-[ext_resource type="Texture2D" uid="uid://d4guxi0davrnw" path="res://assets/world/tiles/forgotten_memories/tileset_water_edge.png" id="1_s1w4e"]
+[ext_resource type="Texture2D" uid="uid://d4guxi0davrnw" path="res://assets/world/tiles/forgotten_memories/tileset_water_edge.png" id="1_smlcn"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_s1w4e"]
-texture = ExtResource("1_s1w4e")
+texture = ExtResource("1_smlcn")
 texture_region_size = Vector2i(32, 64)
 7:3/animation_speed = 8.0
 7:3/animation_frame_0/duration = 1.0
@@ -120,7 +120,7 @@ texture_region_size = Vector2i(32, 64)
 0:3/0/terrains_peering_bit/top_right_corner = 0
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_7ak87"]
-texture = ExtResource("1_s1w4e")
+texture = ExtResource("1_smlcn")
 texture_region_size = Vector2i(32, 32)
 0:0/animation_speed = 8.0
 0:0/animation_frame_0/duration = 1.0
