@@ -494,6 +494,8 @@ BushXxxDecor(Sprite2D)
 
 - 根节点必须是实际参与渲染和 YSort 的 `Sprite2D`，根节点位置是地面排序点。
 - 图片用根 `Sprite2D.offset` 对齐到底部排序点，不使用空 `Node2D` 根节点和子 Sprite。
+- 默认显示尺寸必须写在灌木源场景根节点的 `scale` 上，地图实例原则上只负责摆放 `position`。不要把默认尺寸写到 `Main.tscn` 或其他地图实例里，否则后续修改源场景时会被实例本地覆盖挡住。
+- `InteractionArea` 和检测形状只描述未缩放素材下的检测范围，由 `BushDecor` 在运行时按根节点的基础缩放同步检测区。不要单独缩放 `CollisionShape2D` 来修大小，避免出现“图片缩小了但检测范围没缩小”或“检测缩小了但图片没缩小”的分裂状态。
 - 灌木常驻呼吸、风吹摆动、进出拨动由 `BushDecor` 控制，不为单棵灌木写专属脚本。
 - 常驻动画和拨动动画只改变视觉旋转、缩放和透明度，不改变根节点 `position`。
 - 透明度使用 `normal_alpha` 和 `faded_alpha` 配置。

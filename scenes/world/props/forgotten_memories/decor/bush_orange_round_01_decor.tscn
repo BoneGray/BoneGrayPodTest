@@ -1,0 +1,29 @@
+[gd_scene format=3 uid="uid://bor01hca8d4px"]
+
+[ext_resource type="Texture2D" path="res://resources/world/props/forgotten_memories/decor/bush_orange_round_01_texture.tres" id="1_texture"]
+[ext_resource type="Script" uid="uid://bx7s018uqcg0f" path="res://scripts/world/props/bush_decor.gd" id="2_bush_decor"]
+
+[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_or01"]
+radius = 3.5
+height = 15.999999
+
+[node name="BushOrangeRound01Decor" type="Sprite2D" unique_id=2120000011]
+y_sort_enabled = true
+position = Vector2(0, -10)
+scale = Vector2(0.5, 0.5)
+texture = ExtResource("1_texture")
+offset = Vector2(0, 6)
+script = ExtResource("2_bush_decor")
+ambient_rotation_degrees = 0.7
+enter_shake_rotation_degrees = 3.8
+exit_shake_rotation_degrees = 1.5
+
+[node name="InteractionArea" type="Area2D" parent="." unique_id=2120000012]
+collision_layer = 0
+collision_mask = 2
+monitorable = false
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="InteractionArea" unique_id=2120000013]
+position = Vector2(0, 10)
+rotation = 1.5707964
+shape = SubResource("CapsuleShape2D_or01")

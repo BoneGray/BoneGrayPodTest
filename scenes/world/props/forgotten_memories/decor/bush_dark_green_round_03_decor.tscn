@@ -1,0 +1,28 @@
+[gd_scene format=3 uid="uid://bdg03ukf5n7rx"]
+
+[ext_resource type="Texture2D" path="res://resources/world/props/forgotten_memories/decor/bush_dark_green_round_03_texture.tres" id="1_texture"]
+[ext_resource type="Script" uid="uid://bx7s018uqcg0f" path="res://scripts/world/props/bush_decor.gd" id="2_bush_decor"]
+
+[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_dg03"]
+radius = 8.0
+height = 24.0
+
+[node name="BushDarkGreenRound03Decor" type="Sprite2D" unique_id=2110000031]
+y_sort_enabled = true
+position = Vector2(0, -13)
+scale = Vector2(0.5, 0.5)
+texture = ExtResource("1_texture")
+offset = Vector2(0, -4)
+script = ExtResource("2_bush_decor")
+ambient_duration = 3.0
+ambient_rotation_degrees = 0.8
+
+[node name="InteractionArea" type="Area2D" parent="." unique_id=2110000032]
+collision_layer = 0
+collision_mask = 2
+monitorable = false
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="InteractionArea" unique_id=2110000033]
+position = Vector2(0, -2)
+rotation = 1.5707964
+shape = SubResource("CapsuleShape2D_dg03")

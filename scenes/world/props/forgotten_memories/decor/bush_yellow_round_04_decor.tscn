@@ -1,0 +1,27 @@
+[gd_scene format=3 uid="uid://chsmerycaejg3"]
+
+[ext_resource type="Texture2D" path="res://resources/world/props/forgotten_memories/decor/bush_yellow_round_04_texture.tres" id="1_texture"]
+[ext_resource type="Script" uid="uid://bx7s018uqcg0f" path="res://scripts/world/props/bush_decor.gd" id="2_bush_decor"]
+
+[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_v478w"]
+radius = 14.0
+
+[node name="BushYellowRound04Decor" type="Sprite2D" unique_id=928101351]
+y_sort_enabled = true
+scale = Vector2(0.5, 0.5)
+texture = ExtResource("1_texture")
+offset = Vector2(0, -6)
+script = ExtResource("2_bush_decor")
+ambient_duration = 3.1
+ambient_rotation_degrees = 0.85
+enter_shake_rotation_degrees = 4.4
+exit_shake_rotation_degrees = 1.9
+
+[node name="InteractionArea" type="Area2D" parent="." unique_id=1861514277]
+collision_layer = 0
+collision_mask = 2
+monitorable = false
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="InteractionArea" unique_id=1075478763]
+position = Vector2(0, -2)
+shape = SubResource("CapsuleShape2D_v478w")

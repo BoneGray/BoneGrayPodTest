@@ -1,13 +1,13 @@
-[gd_scene format=3 uid="uid://cfo2lx4uvdirw"]
+[gd_scene format=3 uid="uid://qexusm7vfxk0"]
 
-[ext_resource type="Texture2D" path="res://resources/world/props/forgotten_memories/decor/bush_green_round_01_texture.tres" id="1_texture"]
+[ext_resource type="Texture2D" path="res://resources/world/props/forgotten_memories/decor/bush_yellow_round_01_texture.tres" id="1_texture"]
 [ext_resource type="Script" uid="uid://bx7s018uqcg0f" path="res://scripts/world/props/bush_decor.gd" id="2_bush_decor"]
 
 [sub_resource type="CapsuleShape2D" id="CapsuleShape2D_dsjv6"]
 radius = 3.5
 height = 15.999999
 
-[node name="BushGreenRound01Decor" type="Sprite2D" unique_id=2100000011]
+[node name="BushYellowRound01Decor" type="Sprite2D" unique_id=1352831117]
 y_sort_enabled = true
 position = Vector2(0, -10)
 scale = Vector2(0.5, 0.5)
@@ -18,12 +18,12 @@ ambient_rotation_degrees = 0.7
 enter_shake_rotation_degrees = 3.8
 exit_shake_rotation_degrees = 1.5
 
-[node name="InteractionArea" type="Area2D" parent="." unique_id=2100000012]
+[node name="InteractionArea" type="Area2D" parent="." unique_id=2124957484]
 collision_layer = 0
 collision_mask = 2
 monitorable = false
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="InteractionArea" unique_id=2100000013]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="InteractionArea" unique_id=2037026295]
 position = Vector2(0, 10)
 rotation = 1.5707964
 shape = SubResource("CapsuleShape2D_dsjv6")

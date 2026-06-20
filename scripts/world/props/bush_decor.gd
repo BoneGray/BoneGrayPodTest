@@ -97,11 +97,13 @@ var _shake_oscillations := 1.0
 var _shake_sign := 1.0
 var _interaction_area: Area2D
 var _interaction_area_local_position := Vector2.ZERO
+var _base_global_scale := Vector2.ONE
 
 
 func _ready() -> void:
 	_base_rotation = rotation
 	_base_scale = scale
+	_base_global_scale = global_scale
 	_base_alpha = normal_alpha
 	modulate.a = normal_alpha
 	if randomize_phase:
@@ -140,8 +142,9 @@ func _connect_interaction_area() -> void:
 func _sync_interaction_area() -> void:
 	if _interaction_area == null:
 		return
-	_interaction_area.global_position = global_position + _interaction_area_local_position
+	_interaction_area.global_position = global_position + _interaction_area_local_position * _base_global_scale
 	_interaction_area.global_rotation = 0.0
+	_interaction_area.global_scale = _base_global_scale
 
 
 func _on_body_entered(body: Node) -> void:
