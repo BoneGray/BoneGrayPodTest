@@ -87,7 +87,7 @@ Imported terrain experiment assets:
 
 Generated TileSet resources:
 
-- `res://resources/tiles/forgotten_memories_water_tileset.tres`
+- `res://resources/tiles/fm_water_tileset.tres`
 
 Water animation rules:
 
@@ -96,7 +96,7 @@ Water animation rules:
 - Water tiles use 6 horizontal frames.
 - Animation starts are placed at atlas columns `0, 6, 12, 18, 24` where the 6-frame strip has visible pixels.
 - Each frame duration is `0.16` seconds.
-- Use `res://resources/tiles/forgotten_memories_water_tileset.tres` for this water layer.
+- Use `res://resources/tiles/fm_water_tileset.tres` for this water layer.
 - Regenerate with `res://tools/create_forgotten_memories_water_tileset.gd` when the water sheet changes.
 
 Navigation rule:
@@ -112,23 +112,18 @@ Navigation rule:
 
 Current maintained gameplay scene:
 
-- `res://scenes/navigation_obstacle_test_scene.tscn`
-
-Scene generator:
-
-- `res://tools/create_navigation_obstacle_test_scene.gd`
+- `res://scenes/Main.tscn`
 
 Validation:
 
-- `res://tools/validate_navigation_obstacle_test_scene.gd`
 - `res://tools/validate_render_layer_baseline.gd`
-- `res://tools/validate_navigation_obstacle_big_attacks.gd`
+- `res://tools/validate_main_tilemap_navigation.gd`
 
 Rules:
 
 - The scene uses `TerrainLayer`, `WorldActors`, `WorldEffects`, and `HighOverlay`.
-- Player, Big, Small, Axe, pickups, and obstacle bodies live under `WorldActors` so they follow the current YSort layer rules.
-- Deleted legacy scenes such as `myScene`, `combat_test_scene`, `terrain_random_demo`, and `floor_only_random_map` are not maintained.
+- Player, active test props, pickups, enemies when placed, and obstacle bodies live under `WorldActors` so they follow the current YSort layer rules.
+- Deleted legacy scenes such as `myScene`, `combat_test_scene`, `navigation_obstacle_test_scene`, `tileset_preview`, `terrain_random_demo`, and `floor_only_random_map` are not maintained.
 - Do not restore old root-level YSort test scenes; rebuild old experiments inside the current scene structure if the feature returns.
 
 ## Archived Prototypes

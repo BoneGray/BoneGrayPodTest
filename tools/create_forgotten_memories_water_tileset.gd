@@ -1,7 +1,7 @@
 extends SceneTree
 
 const SOURCE_TEXTURE := "res://assets/world/tiles/forgotten_memories/tileset_water_forgotten_memories_sheet6.png"
-const OUTPUT_TILESET := "res://resources/tiles/forgotten_memories_water_tileset.tres"
+const OUTPUT_TILESET := "res://resources/tiles/fm_water_tileset.tres"
 const TILE_SIZE := Vector2i(32, 32)
 const FRAME_COUNT := 6
 const FRAME_DURATION := 0.16

@@ -53,9 +53,7 @@ func _generate_layer_parts() -> void:
 		push_warning("%s has no compound prop definition." % name)
 		return
 
-	var scene_root := get_tree().current_scene
-	if scene_root == null:
-		scene_root = get_tree().root.get_child(0)
+	var scene_root := _find_scene_root()
 	if scene_root == null:
 		push_warning("%s could not find scene root for compound prop generation." % name)
 		return
@@ -66,6 +64,20 @@ func _generate_layer_parts() -> void:
 		push_warning("%s has no source scene for compound prop generation." % name)
 		return
 	_generate_from_source_scene(scene_root, source_scene, prefix)
+
+
+func _find_scene_root() -> Node:
+	var scene_root: Node = self
+	while scene_root.get_parent() != null and scene_root.get_parent() != get_tree().root:
+		scene_root = scene_root.get_parent()
+	if scene_root != self:
+		return scene_root
+
+	if get_tree().current_scene != null:
+		return get_tree().current_scene
+	if get_tree().root.get_child_count() > 0:
+		return get_tree().root.get_child(0)
+	return null
 
 
 func _generate_from_source_scene(scene_root: Node, source_scene: PackedScene, prefix: String) -> void:

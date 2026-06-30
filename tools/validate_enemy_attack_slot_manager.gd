@@ -1,7 +1,8 @@
 @tool
 extends SceneTree
 
-const SCENE_PATH := "res://scenes/navigation_obstacle_test_scene.tscn"
+const PLAYER_SCENE_PATH := "res://scenes/characters/player.tscn"
+const ENEMY_SCENE_PATH := "res://scenes/characters/enemy.tscn"
 
 
 func _initialize() -> void:
@@ -9,32 +10,32 @@ func _initialize() -> void:
 
 
 func _run() -> void:
-	var scene := load(SCENE_PATH) as PackedScene
-	if scene == null:
-		push_error("Could not load enemy test scene.")
+	var player_scene := load(PLAYER_SCENE_PATH) as PackedScene
+	var enemy_scene := load(ENEMY_SCENE_PATH) as PackedScene
+	if player_scene == null or enemy_scene == null:
+		push_error("Could not load player or enemy scene.")
 		quit(1)
 		return
 
-	var root := scene.instantiate()
+	var root := Node2D.new()
+	root.name = "AttackSlotValidationRoot"
+	var world_actors := Node2D.new()
+	world_actors.name = "WorldActors"
+	world_actors.y_sort_enabled = true
+	root.add_child(world_actors)
 	get_root().add_child(root)
 
-	await process_frame
+	var player := player_scene.instantiate() as CharacterBody2D
+	player.name = "Player"
+	world_actors.add_child(player)
+	player.global_position = Vector2.ZERO
 
-	var world_actors := root.get_node_or_null("WorldActors")
-	var player := world_actors.get_node_or_null("Player") as CharacterBody2D if world_actors != null else null
-	var enemies := _find_enemy_bodies(root)
-	if world_actors == null or player == null:
-		push_error("Navigation obstacle test scene should contain WorldActors and Player.")
-		root.queue_free()
-		quit(1)
-		return
-
-	var enemy_scene := load("res://scenes/characters/enemy.tscn") as PackedScene
-	while enemies.size() < 5:
-		var extra_enemy := enemy_scene.instantiate() as CharacterBody2D
-		extra_enemy.name = "EnemyExtra%s" % enemies.size()
-		world_actors.add_child(extra_enemy)
-		enemies.append(extra_enemy)
+	var enemies := []
+	for i in 5:
+		var enemy := enemy_scene.instantiate() as CharacterBody2D
+		enemy.name = "EnemyExtra%s" % i
+		world_actors.add_child(enemy)
+		enemies.append(enemy)
 
 	await process_frame
 
@@ -87,11 +88,3 @@ func _run() -> void:
 	print("Enemy attack slot manager is valid.")
 	root.queue_free()
 	quit()
-
-
-func _find_enemy_bodies(root: Node) -> Array:
-	var enemies := []
-	for body in root.find_children("*", "CharacterBody2D", true, false):
-		if body.is_in_group("enemy"):
-			enemies.append(body)
-	return enemies

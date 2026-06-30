@@ -2,7 +2,7 @@
 extends SceneTree
 
 const RenderLayers := preload("res://scripts/render/render_layers.gd")
-const SCENE_PATH := "res://scenes/navigation_obstacle_test_scene.tscn"
+const SCENE_PATH := "res://scenes/Main.tscn"
 const CHARACTER_SCENE_PATHS := [
 	"res://scenes/characters/player.tscn",
 	"res://scenes/characters/enemy.tscn",
@@ -34,19 +34,24 @@ func _run() -> void:
 
 	var root := scene.instantiate()
 	get_root().add_child(root)
+	current_scene = root
 
 	await process_frame
 
 	var terrain_layer := root.get_node_or_null("TerrainLayer") as Node2D
+	var shadow_layer := root.get_node_or_null("ShadowLayer") as Node2D
 	var world_actors := root.get_node_or_null("WorldActors") as Node2D
 	var world_effects := root.get_node_or_null("WorldEffects") as Node2D
 	var high_overlay := root.get_node_or_null("HighOverlay") as Node2D
-	if terrain_layer == null or world_actors == null or world_effects == null or high_overlay == null:
-		_fail(root, "Navigation obstacle test scene should expose TerrainLayer, WorldActors, WorldEffects, and HighOverlay.")
+	if terrain_layer == null or shadow_layer == null or world_actors == null or world_effects == null or high_overlay == null:
+		_fail(root, "Main scene should expose TerrainLayer, ShadowLayer, WorldActors, WorldEffects, and HighOverlay.")
 		return
 
 	if terrain_layer.z_index != RenderLayers.TERRAIN_Z:
 		_fail(root, "TerrainLayer should use RenderLayers.TERRAIN_Z.")
+		return
+	if shadow_layer.z_index != RenderLayers.SHADOW_Z:
+		_fail(root, "ShadowLayer should use RenderLayers.SHADOW_Z.")
 		return
 	if not world_actors.y_sort_enabled or world_actors.z_index != RenderLayers.WORLD_Y_SORT_Z:
 		_fail(root, "WorldActors should enable YSort and use RenderLayers.WORLD_Y_SORT_Z.")
@@ -58,25 +63,16 @@ func _run() -> void:
 		_fail(root, "HighOverlay should use RenderLayers.HIGH_OVERLAY_Z.")
 		return
 
-	if terrain_layer.get_node_or_null("Floor") == null:
-		_fail(root, "Floor should live under TerrainLayer and should not participate in WorldActors YSort.")
+	if terrain_layer.get_node_or_null("FloorLayer") == null:
+		_fail(root, "FloorLayer should live under TerrainLayer and should not participate in WorldActors YSort.")
 		return
 
-	for node_name in ["Player", "EnemyZombieAxe", "NavEnemy1", "NavBig1", "BaseballBatPickup", "GunPickup", "PistolPickup", "ShotgunPickup"]:
+	for node_name in ["Player", "BushYellowRound05Decor", "BushYellowRound03Decor", "BushYellowRound04Decor", "WallBodyLayer"]:
 		var actor := world_actors.get_node_or_null(node_name) as Node2D
 		if actor == null:
 			_fail(root, "%s should live under WorldActors." % node_name)
 			return
 		if actor.z_index != RenderLayers.WORLD_Y_SORT_Z:
-			_fail(root, "%s should keep the WorldActors baseline z-index." % node_name)
-			return
-
-	for node_name in ["OuterObstacle1Body", "OuterObstacle2Body", "OuterObstacle3Body", "OuterObstacle4Body", "InnerObstacle1Body", "InnerObstacle2Body", "InnerObstacle3Body"]:
-		var obstacle := world_actors.get_node_or_null(node_name) as StaticBody2D
-		if obstacle == null:
-			_fail(root, "%s should live under WorldActors so obstacle visuals use the same y-sort rule as characters." % node_name)
-			return
-		if obstacle.z_index != RenderLayers.WORLD_Y_SORT_Z:
 			_fail(root, "%s should keep the WorldActors baseline z-index." % node_name)
 			return
 
